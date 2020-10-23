@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config VIDEO_SUN8I_A83T_MIPI_CSI2
+	tristate "Allwinner A83T MIPI CSI-2 Controller and D-PHY Driver"
+	depends on VIDEO_V4L2 && COMMON_CLK
+	depends on ARCH_SUNXI || COMPILE_TEST
+	select MEDIA_CONTROLLER
+	select VIDEO_V4L2_SUBDEV_API
+	select REGMAP_MMIO
+	select V4L2_FWNODE
+	help
+	   Support for the Allwinner A83T MIPI CSI-2 Controller and D-PHY.
