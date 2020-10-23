@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config VIDEO_SUN6I_MIPI_CSI2
+	tristate "Allwinner A31 MIPI CSI-2 Controller Driver"
+	depends on VIDEO_V4L2 && COMMON_CLK
+	depends on ARCH_SUNXI || COMPILE_TEST
+	select MEDIA_CONTROLLER
+	select VIDEO_V4L2_SUBDEV_API
+	select REGMAP_MMIO
+	select V4L2_FWNODE
+	help
+	   Support for the Allwinner A31 MIPI CSI-2 Controller.
