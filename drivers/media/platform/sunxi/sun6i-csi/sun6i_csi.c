@@ -378,7 +378,12 @@ static void sun6i_csi_setup_bus(struct sun6i_csi_dev *sdev)
 	unsigned char bus_width;
 	u32 flags;
 	u32 cfg;
+	bool input_parallel = false;
 	bool input_interlaced = false;
+
+	if (endpoint->bus_type == V4L2_MBUS_PARALLEL ||
+	    endpoint->bus_type == V4L2_MBUS_BT656)
+		input_parallel = true;
 
 	if (csi->config.field == V4L2_FIELD_INTERLACED
 	    || csi->config.field == V4L2_FIELD_INTERLACED_TB
@@ -394,6 +399,26 @@ static void sun6i_csi_setup_bus(struct sun6i_csi_dev *sdev)
 		 CSI_IF_CFG_CLK_POL_MASK | CSI_IF_CFG_VREF_POL_MASK |
 		 CSI_IF_CFG_HREF_POL_MASK | CSI_IF_CFG_FIELD_MASK |
 		 CSI_IF_CFG_SRC_TYPE_MASK);
+
+	if (input_parallel) {
+		switch (bus_width) {
+		case 8:
+			cfg |= CSI_IF_CFG_IF_DATA_WIDTH_8BIT;
+			break;
+		case 10:
+			cfg |= CSI_IF_CFG_IF_DATA_WIDTH_10BIT;
+			break;
+		case 12:
+			cfg |= CSI_IF_CFG_IF_DATA_WIDTH_12BIT;
+			break;
+		case 16: /* No need to configure DATA_WIDTH for 16bit */
+			break;
+		default:
+			dev_warn(sdev->dev, "Unsupported bus width: %u\n",
+				 bus_width);
+			break;
+		}
+	}
 
 	if (input_interlaced)
 		cfg |= CSI_IF_CFG_SRC_TYPE_INTERLACED;
@@ -437,23 +462,6 @@ static void sun6i_csi_setup_bus(struct sun6i_csi_dev *sdev)
 	default:
 		dev_warn(sdev->dev, "Unsupported bus type: %d\n",
 			 endpoint->bus_type);
-		break;
-	}
-
-	switch (bus_width) {
-	case 8:
-		cfg |= CSI_IF_CFG_IF_DATA_WIDTH_8BIT;
-		break;
-	case 10:
-		cfg |= CSI_IF_CFG_IF_DATA_WIDTH_10BIT;
-		break;
-	case 12:
-		cfg |= CSI_IF_CFG_IF_DATA_WIDTH_12BIT;
-		break;
-	case 16: /* No need to configure DATA_WIDTH for 16bit */
-		break;
-	default:
-		dev_warn(sdev->dev, "Unsupported bus width: %u\n", bus_width);
 		break;
 	}
 
