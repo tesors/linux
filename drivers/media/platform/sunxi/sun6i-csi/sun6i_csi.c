@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/of_reserved_mem.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
@@ -849,6 +850,12 @@ static int sun6i_csi_resource_request(struct sun6i_csi_dev *sdev,
 		return PTR_ERR(sdev->regmap);
 	}
 
+	ret = of_reserved_mem_device_init(&pdev->dev);
+	if (ret && ret != -ENODEV) {
+		dev_err(&pdev->dev, "Unable to init reserved memory\n");
+		return ret;
+	}
+
 	sdev->clk_mod = devm_clk_get(&pdev->dev, "mod");
 	if (IS_ERR(sdev->clk_mod)) {
 		dev_err(&pdev->dev, "Unable to acquire csi clock\n");
@@ -924,6 +931,7 @@ static int sun6i_csi_remove(struct platform_device *pdev)
 	struct sun6i_csi_dev *sdev = platform_get_drvdata(pdev);
 
 	sun6i_csi_v4l2_cleanup(&sdev->csi);
+	of_reserved_mem_device_release(sdev->dev);
 
 	return 0;
 }
