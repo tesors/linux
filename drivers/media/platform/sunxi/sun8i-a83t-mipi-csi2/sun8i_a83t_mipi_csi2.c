@@ -25,34 +25,6 @@
 
 /* Core */
 
-static irqreturn_t sun8i_a83t_mipi_csi2_isr(int irq, void *dev_id)
-{
-	struct sun8i_a83t_mipi_csi2_dev *cdev =
-		(struct sun8i_a83t_mipi_csi2_dev *)dev_id;
-	struct regmap *regmap = cdev->regmap;
-	u32 status;
-
-	WARN_ONCE(1, MODULE_NAME
-		  ": Unsolicited interrupt, an error likely occurred!\n");
-
-	regmap_read(regmap, SUN8I_A83T_MIPI_CSI2_INT_STA0_REG, &status);
-	regmap_write(regmap, SUN8I_A83T_MIPI_CSI2_INT_STA0_REG, status);
-
-	regmap_read(regmap, SUN8I_A83T_MIPI_CSI2_INT_STA1_REG, &status);
-	regmap_write(regmap, SUN8I_A83T_MIPI_CSI2_INT_STA1_REG, status);
-
-	regmap_read(regmap, SUN8I_A83T_MIPI_CSI2_INT_MSK0_REG, &status);
-	regmap_read(regmap, SUN8I_A83T_MIPI_CSI2_INT_MSK1_REG, &status);
-
-	/*
-	 * The interrupt can be used to catch transmission errors.
-	 * However, we currently lack plumbing for reporting that to the
-	 * A31 CSI controller driver.
-	 */
-
-	return IRQ_HANDLED;
-}
-
 static void sun8i_a83t_mipi_csi2_init(struct sun8i_a83t_mipi_csi2_dev *cdev)
 {
 	struct regmap *regmap = cdev->regmap;
@@ -587,7 +559,6 @@ static int sun8i_a83t_mipi_csi2_resource_request(struct sun8i_a83t_mipi_csi2_dev
 {
 	struct resource *res;
 	void __iomem *io_base;
-	int irq;
 	int ret;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -624,17 +595,6 @@ static int sun8i_a83t_mipi_csi2_resource_request(struct sun8i_a83t_mipi_csi2_dev
 	if (IS_ERR(cdev->reset)) {
 		dev_err(&pdev->dev, "failed to get reset controller\n");
 		return PTR_ERR(cdev->reset);
-	}
-
-	irq = platform_get_irq(pdev, 0);
-	if (irq < 0)
-		return -ENXIO;
-
-	ret = devm_request_irq(&pdev->dev, irq, sun8i_a83t_mipi_csi2_isr, 0,
-			       MODULE_NAME, cdev);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to request MIPI CSI-2 IRQ\n");
-		return ret;
 	}
 
 	ret = sun8i_a83t_dphy_register(cdev);
