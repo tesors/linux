@@ -305,6 +305,16 @@
 				pins = "PB8", "PB9";
 				function = "uart0";
 			};
+            
+            uart2_pins: uart2-pins {
+				pins = "PB0", "PB1";
+				function = "uart2";
+			};
+
+			uart2_rts_cts_pins: uart2-rts-cts-pins {
+				pins = "PB2", "PB3";
+				function = "uart2";
+			};
 
 			mmc0_pins: mmc0-pins {
 				pins = "PF0", "PF1", "PF2", "PF3",
