@@ -1,0 +1,232 @@
+/*
+ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
+ *
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPL or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This file is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This file is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ * Or, alternatively,
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use,
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/dts-v1/;
+#include "sun8i-v3s.dtsi"
+#include "sunxi-common-regulators.dtsi"
+
+/ {
+/*	model = "Allwinner V3s Generic Device";
+	compatible = "allwinner,sun8i-v3s";
+*/
+
+	aliases {
+		serial0 = &uart2;
+		serial1 = &uart1;
+		spi0 = &spi0;
+		i2c0 = &i2c0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};	
+	
+    reg_vcc3v3: vcc3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc3v3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+	
+	wifi_pwrseq: wifi_pwrseq {
+		compatible = "mmc-pwrseq-simple";
+		reset-gpios = <&pio 4 0 GPIO_ACTIVE_LOW>; /* PE0 WIFI-EN */
+        clocks = <&rtc 1>;
+		clock-names = "ext_clock";
+	};
+	
+    leds {
+        compatible = "gpio-leds";
+
+        blue_led {
+			label = "licheepi:blue:usr";
+			gpios = <&pio 4 7 GPIO_ACTIVE_LOW>; /* PE7 */
+		};
+
+        green_led {
+			label = "licheepi:green:usr";
+			gpios = <&pio 4 5 GPIO_ACTIVE_LOW>; /* PE5 */
+			default-state = "on";
+		};
+
+        red_led {
+			label = "licheepi:red:usr";
+			gpios = <&pio 4 6 GPIO_ACTIVE_LOW>; /* PE6 */
+		};
+	};
+};
+
+&mmc0 {
+    vmmc-supply = <&reg_vcc3v3>;
+	vqmmc-supply = <&reg_vcc3v3>;
+	mmc-pwrseq = <&wifi_pwrseq>;
+    bus-width = <4>;
+    non-removable;
+    no-1-8-v;
+	status = "okay";
+    
+    brcmf: wifi@1 {
+		reg = <1>;
+		compatible = "brcm,bcm43362-fmac";
+		interrupt-parent = <&pio>;
+		interrupts = <4 1 IRQ_TYPE_LEVEL_LOW>; /* PE1 */
+		interrupt-names = "host-wake";
+	};
+	
+};
+
+&mmc1 {
+	broken-cd;
+	bus-width = <4>;
+	vmmc-supply = <&reg_vcc3v3>;
+	status = "okay";
+};
+
+ &uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_pe_pins>, <&uart1_rts_cts_pins>;
+	uart-has-rtscts;
+	status = "okay";
+	
+	bluetooth {
+		compatible = "brcm,bcm20702a1";
+		clocks = <&rtc 1>;
+		clock-names = "lpo";
+		vbat-supply = <&reg_vcc3v3>;
+		vddio-supply = <&reg_vcc3v3>;
+		device-wakeup-gpios = <&pio 4 3 GPIO_ACTIVE_HIGH>; /* PE3 */
+		shutdown-gpios = <&pio 4 4 GPIO_ACTIVE_HIGH>; /* PE4 */
+        /*interrupt-parent = <&pio>;*/
+		/*interrupts = <4 2 IRQ_TYPE_LEVEL_LOW>;*/ /* PE2 */
+		/*interrupt-names = "host-wakeup";*/
+        host-wakeup-gpios = <&pio 4 2 GPIO_ACTIVE_HIGH>; /* PE2 */
+        local-bd-address = [00 12 34 56 78 9A];
+		max-speed = <1500000>;
+    };
+};
+
+&uart2 {
+	pinctrl-0 = <&uart2_pb_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&spi0 {
+    status = "okay";
+};
+
+&pio {
+	i2c1_pins: i2c1-pins {
+		pins = "PB8", "PB9";
+		function = "i2c1";
+    };
+    
+    uart1_pe_pins: uart1-pe-pins {
+        pins = "PE21", "PE22";
+        function = "uart1";
+    };
+    
+    uart1_rts_cts_pins: uart1-rts-cts-pins {
+        pins = "PE23", "PE24";
+        function = "uart1";
+    };
+    
+    uart2_pb_pins: uart2-pb-pins {
+        pins = "PB0", "PB1";
+        function = "uart2";
+    };
+};
+
+&i2c0 {
+    status = "okay";
+    bq24735: bq24735@9 {
+        compatible = "ti,bq24735";
+        reg = <0x9>;
+        ti,charge-current=<1472>;
+        ti,charge-voltage=<14592>;
+        ti,input-current=<1536>;
+        poll-interval=<20000>;
+        #ti,external-control;
+    };
+    bq20z75: bq20z75@b {
+        compatible = "sbs,sbs-battery";
+        reg = <0xb>;
+        sbs,i2c-retry-count=<2>;
+        sbs,poll-retry-count=<1>;
+    };
+};
+
+&i2c1 {
+    status = "okay";
+    pinctrl-names = "default";
+    pinctrl-0 = <&i2c1_pins>;
+
+    usb2517: usb2517@2c {
+		compatible = "microchip,usb2517";
+		reg = <0x2c>;
+	};
+    kxtj3: kxtj3@e {
+		compatible = "kionix,kxtj31057";
+        reg = <0xe>;
+		status = "okay";
+		phandle = <0x10>;
+    };
+};
+
+&usb_otg {
+	dr_mode = "otg";
+	status = "okay";
+};
+
+&usbphy {
+	usb0_id_det-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
+	status = "okay";
+};
+
+&ehci0 {
+    status = "okay";
+};
+
+&ohci0 {
+    status = "okay";
+};
+ 
