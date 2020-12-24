@@ -1,0 +1,197 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2019 Icenowy Zheng <icenowy@aosc.io>
+ */
+
+/dts-v1/;
+#include "sun8i-v3.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+
+/ {
+	model = "Sipeed Lichee Zero Plus";
+	compatible = "sipeed,lichee-zero-plus", "sochip,s3",
+		     "allwinner,sun8i-v3";
+
+	aliases {
+		serial0 = &uart1;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	reg_vcc3v3: vcc3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc3v3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+	
+    syscon: syscon@1c00000 {
+        compatible = "allwinner,sun8i-v3s-system-controller", "allwinner,sun8i-h3-system-control", "syscon";
+        reg = <0x01c00000 0x1000>;
+        #address-cells = <1>;
+        #size-cells = <1>;
+        ranges;
+
+        sram_c: sram@1d00000 {
+            compatible = "mmio-sram";
+            reg = <0x01d00000 0x80000>;
+            #address-cells = <1>;
+            #size-cells = <1>;
+            ranges = <0 0x01d00000 0x80000>;
+
+            ve_sram: sram-section@0 {
+                compatible = "allwinner,sun8i-v3s-sram-c", "allwinner,sun4i-a10-sram-c1";
+                reg = <0x000000 0x80000>;
+            };
+        };
+    };	
+	
+	cedarx: video-codec@1c0e000 {
+        compatible = "allwinner,sun8i-v3-cedar";
+        reg = <0x01c0e000 0x1000>;
+        clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>, <&ccu CLK_DRAM_VE>;
+        clock-names = "ahb", "mod", "ram";
+        resets = <&ccu RST_BUS_VE>;
+        interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
+        allwinner,sram = <&ve_sram 1>;
+        status = "disabled";
+    };
+        
+    ion: ion {
+        compatible = "allwinner,sunxi-ion";
+        status = "disabled";
+        heap_cma@0{
+            compatible = "allwinner,cma";
+            heap-name  = "cma";
+            heap-id    = <0x4>;
+            heap-base  = <0x0>;
+            heap-size  = <0x0>;
+            heap-type  = "ion_cma";
+        };
+    };
+	
+    emac: ethernet@1c30000 {
+            compatible = "allwinner,sun8i-h3-emac";
+            syscon = <&syscon>;
+            reg = <0x01c30000 0x10000>;
+            interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+            interrupt-names = "macirq";
+            resets = <&ccu RST_BUS_EMAC>;
+            reset-names = "stmmaceth";
+            clocks = <&ccu CLK_BUS_EMAC>;
+            clock-names = "stmmaceth";
+            status = "disabled";
+
+            mdio: mdio {
+                #address-cells = <1>;
+                #size-cells = <0>;
+                compatible = "snps,dwmac-mdio";
+            };
+
+            mdio-mux {
+                compatible = "allwinner,sun8i-h3-mdio-mux";
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                mdio-parent-bus = <&mdio>;
+                /* Only one MDIO is usable at the time */
+                internal_mdio: mdio@1 {
+                    compatible = "allwinner,sun8i-h3-mdio-internal";
+                    reg = <1>;
+                    #address-cells = <1>;
+                    #size-cells = <0>;
+
+                    int_mii_phy: ethernet-phy@1 {
+                        compatible = "ethernet-phy-ieee802.3-c22";
+                        reg = <1>;
+                        clocks = <&ccu CLK_BUS_EPHY>;
+                        resets = <&ccu RST_BUS_EPHY>;
+                    };
+                };
+
+                external_mdio: mdio@2 {
+                    reg = <2>;
+                    #address-cells = <1>;
+                    #size-cells = <0>;
+                };
+            };
+        };
+};
+
+&emac {
+    phy-handle = <&int_mii_phy>;
+    phy-mode = "mii";
+    allwinner,use-internal-phy;
+    status = "okay";
+};
+
+&mmc2 {
+    non-removable;
+    vmmc-supply = <&reg_vcc3v3>;
+    bus-width = <4>;
+    max-speed = <20000000>;
+    mmc-ddr-3_3v;
+    cap-mmc-hw-reset;
+    status = "okay";
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&usb_otg {
+	dr_mode = "peripheral";
+	status = "okay";
+};
+
+&usbphy {
+	usb0_id_det-gpios = <&pio 4 19 GPIO_ACTIVE_HIGH>;
+	status = "okay";
+};
+
+&i2c1 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&i2c1_pins>;
+    status = "okay";
+    
+    tc358743: tc358743@f {
+        compatible = "toshiba,tc358743";
+		reg = <0x0f>;
+		rst-gpios = <&pio 1 11 GPIO_ACTIVE_LOW>;
+		interrupts-extended = <&pio 5 6 IRQ_TYPE_LEVEL_LOW>;
+		clocks = <&tc358743_clk>;
+		clock-names = "refclk";
+		tc358743_clk: bridge-clk {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <27000000>;
+		};
+
+		port {
+			tc358743_out: endpoint {
+                remote-endpoint = <&mipi_csi2_in>;
+                clock-lanes = <0>;
+				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <297000000>;
+				};
+        };
+    };
+};
+
+&csi0 {
+    status = "okay";
+    allwinner,mipi-csi-bps = <594000000>;
+    port {
+        mipi_csi2_in: endpoint {
+            remote-endpoint = <&tc358743_out>;
+            data-lanes = <1 2 3 4>;
+            clock-lanes = <0>;
+        };
+    };
+};
+
