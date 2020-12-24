@@ -58,6 +58,7 @@ static const u32 supported_pixformats[] = {
 	V4L2_PIX_FMT_YUV422P,
 	V4L2_PIX_FMT_RGB565,
 	V4L2_PIX_FMT_RGB565X,
+    V4L2_PIX_FMT_RGB24,
 	V4L2_PIX_FMT_JPEG,
 };
 
@@ -141,6 +142,8 @@ static int sun6i_video_start_streaming(struct vb2_queue *vq, unsigned int count)
 
 	video->sequence = 0;
 
+    dev_dbg(video->csi->dev, "Start streaming!\n");
+    
 	ret = media_pipeline_start(&video->vdev.entity, &video->vdev.pipe);
 	if (ret < 0)
 		goto clear_dma_queue;
