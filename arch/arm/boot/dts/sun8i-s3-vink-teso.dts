@@ -58,21 +58,21 @@
 			gpios = <&pio 3 10 GPIO_ACTIVE_LOW>; /* PD10 */
 		};
 		
-        blue3_led {
-			label = "licheepi:blue:usr";
-			gpios = <&pio 1 10 GPIO_ACTIVE_LOW>; /* PB10 */
-		};
-
-		green3_led {
-			label = "licheepi:green:usr";
-			gpios = <&pio 1 6 GPIO_ACTIVE_LOW>; /* PB6 */
-			default-state = "on";
-		};
-
-		red3_led {
-			label = "licheepi:red:usr";
-			gpios = <&pio 1 7 GPIO_ACTIVE_LOW>; /* PB7 */
-		};
+//        blue3_led {
+//			label = "licheepi:blue:usr";
+//			gpios = <&pio 1 10 GPIO_ACTIVE_LOW>; /* PB10 */
+//		};
+//
+//		green3_led {
+//			label = "licheepi:green:usr";
+//			gpios = <&pio 1 6 GPIO_ACTIVE_LOW>; /* PB6 */
+//			default-state = "on";
+//		};
+//
+//		red3_led {
+//			label = "licheepi:red:usr";
+//			gpios = <&pio 1 7 GPIO_ACTIVE_LOW>; /* PB7 */
+//		};
 		
         blue4_led {
 			label = "licheepi:blue:usr";
@@ -188,6 +188,19 @@
 	status = "okay";
 };
 
+&i2c0 {
+    clock-frequency = <100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c0_pins>;
+	status = "okay";
+	
+    typec_tusb320:tusb320@60 {
+        compatible = "ti,tusb320";
+        reg = <0x60>;
+        int-gpios = <&pio 1 10 GPIO_ACTIVE_LOW>; /* PB10 */
+        otg-vbus-gpios = <&pio 3 9 GPIO_ACTIVE_LOW>; /* PD9 */
+    };
+};
 
 &i2c1 {
 	pinctrl-names = "default";
