@@ -179,12 +179,12 @@
 };
 
 &usb_otg {
-	dr_mode = "peripheral";
+    //extcon = "typec_tusb320";
+	dr_mode = "otg";
 	status = "okay";
 };
 
 &usbphy {
-	usb0_id_det-gpios = <&pio 4 19 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 };
 
@@ -200,6 +200,11 @@
         int-gpios = <&pio 1 10 GPIO_ACTIVE_LOW>; /* PB10 */
         otg-vbus-gpios = <&pio 3 9 GPIO_ACTIVE_LOW>; /* PD9 */
     };
+    
+    axp209: pmic@34 {
+        compatible = "axp209-battery-power-supply";
+		reg = <0x34>;
+	};
 };
 
 &i2c1 {
