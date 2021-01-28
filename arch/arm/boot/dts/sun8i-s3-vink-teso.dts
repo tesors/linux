@@ -269,12 +269,12 @@
 };
 
 &usb_otg {
-	dr_mode = "peripheral";
+    //extcon = "typec_tusb320";
+	dr_mode = "otg";
 	status = "okay";
 };
 
 &usbphy {
-	usb0_id_det-gpios = <&pio 4 19 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 };
 
