@@ -15,8 +15,11 @@
 #include <linux/module.h>
 #include <linux/regmap.h>
 #include <linux/err.h>
+#include <linux/usb/typec.h>
 
 #define TUSB320_REG9				0x9
+#define TUSB320_REGa				0xa
+#define TUSB320_REG45               		0x45
 #define TUSB320_REG9_ATTACHED_STATE_SHIFT	6
 #define TUSB320_REG9_ATTACHED_STATE_MASK	0x3
 #define TUSB320_REG9_CABLE_DIRECTION		BIT(5)
@@ -25,7 +28,18 @@
 #define TUSB320_ATTACHED_STATE_DFP		0x1
 #define TUSB320_ATTACHED_STATE_UFP		0x2
 #define TUSB320_ATTACHED_STATE_ACC		0x3
-#define DEBUG 1
+
+/* Register REG_MODE_SET 0a */
+#define TUSB320_REG_SET_MODE			(BIT(5) | BIT(4))
+#define TUSB320_REG_SET_BY_PORT			0x00
+#define TUSB320_REG_SET_UFP			BIT(4)
+#define TUSB320_REG_SET_DFP			BIT(5)
+#define TUSB320_REG_SET_DRP			(BIT(5) | BIT(4))
+#define TUSB320_REG_SET_SOFT_RESET		BIT(3)
+#define TUSB320_REG_SET_DISABLE_RD_RP		BIT(2)
+
+#define DISABLE_SET 0
+#define DISABLE_CLEAR 1
 
 int state;
 
@@ -36,6 +50,8 @@ struct tusb320_priv {
     struct gpio_desc *irq_gpiod, *otg_vbus_gpiod;
     int id_irq;
 };
+
+struct tusb320_priv *priv;
 
 static const char * const tusb_attached_states[] = {
 	[TUSB320_ATTACHED_STATE_NONE] = "not attached",
@@ -49,6 +65,9 @@ static const unsigned int tusb320_extcon_cable[] = {
 	EXTCON_USB_HOST,
 	EXTCON_NONE,
 };
+
+static void tusb320_disabled_state_exit(enum typec_port_data port_mode);
+static int tusb320_port_mode_set(enum typec_port_data port_mode);
 
 static int tusb320_check_signature(struct tusb320_priv *priv)
 {
@@ -71,7 +90,6 @@ static int tusb320_check_signature(struct tusb320_priv *priv)
 
 static irqreturn_t tusb320_irq_handler(int irq, void *dev_id)
 {
-	struct tusb320_priv *priv = dev_id;
 	int polarity;
 	unsigned reg;
 
@@ -90,16 +108,19 @@ static irqreturn_t tusb320_irq_handler(int irq, void *dev_id)
 	printk("attached state: %s, polarity: %d\n",
 		tusb_attached_states[state], polarity);
     
-    if (state == TUSB320_ATTACHED_STATE_DFP) {
+    if (state == TUSB320_ATTACHED_STATE_DFP || state == TUSB320_ATTACHED_STATE_ACC) {
         gpiod_set_value(priv->otg_vbus_gpiod, 0);
+    } else if (state == TUSB320_ATTACHED_STATE_UFP){
+        gpiod_set_value(priv->otg_vbus_gpiod, 1);
     } else {
+        tusb320_port_mode_set(TUSB320_REG_SET_BY_PORT);
         gpiod_set_value(priv->otg_vbus_gpiod, 1);
     }
 
 	extcon_set_state(priv->edev, EXTCON_USB,
 			 state == TUSB320_ATTACHED_STATE_UFP);
 	extcon_set_state(priv->edev, EXTCON_USB_HOST,
-			 state == TUSB320_ATTACHED_STATE_DFP);
+			 state == TUSB320_ATTACHED_STATE_DFP || state == TUSB320_ATTACHED_STATE_ACC);
 	extcon_set_property(priv->edev, EXTCON_USB,
 			    EXTCON_PROP_USB_TYPEC_POLARITY,
 			    (union extcon_property_value)polarity);
@@ -120,10 +141,87 @@ static const struct regmap_config tusb320_regmap_config = {
 	.val_bits = 8,
 };
 
+static int tusb320_port_mode_set(enum typec_port_data port_mode)
+{
+    unsigned reg, mask_val;
+    
+	regmap_read(priv->regmap, TUSB320_REGa, &reg);
+    
+	switch (port_mode) {
+	case TYPEC_PORT_UFP:
+		mask_val = TUSB320_REG_SET_UFP;
+		break;
+	case TYPEC_PORT_DFP:
+		mask_val = TUSB320_REG_SET_DFP;
+		break;
+	case TYPEC_PORT_DRD:
+		mask_val = TUSB320_REG_SET_DRP;
+		break;
+	default:
+		mask_val = TUSB320_REG_SET_BY_PORT;
+		break;
+	}
+	reg &= ~TUSB320_REG_SET_MODE;
+	reg |= mask_val;
+    
+	regmap_write(priv->regmap, TUSB320_REGa, reg);
+	return 0;
+}
+
+static void tusb320_rd_rp_disable(int set)
+{
+	unsigned reg;
+    
+    regmap_read(priv->regmap, TUSB320_REG45, &reg);
+
+	if (set == DISABLE_SET) {
+		reg |= TUSB320_REG_SET_DISABLE_RD_RP;
+	} else {
+		reg &= ~((unsigned) TUSB320_REG_SET_DISABLE_RD_RP);
+	}
+	
+	regmap_write(priv->regmap, TUSB320_REG45, reg);
+}
+
+static void tusb320_soft_reset(void)
+{
+	unsigned reg;
+    
+	regmap_read(priv->regmap, TUSB320_REGa, &reg);
+    
+	reg |= TUSB320_REG_SET_SOFT_RESET;
+    
+	regmap_write(priv->regmap, TUSB320_REGa, reg);
+}
+
+static void tusb320_disabled_state_start(void)
+{
+	tusb320_port_mode_set(TYPEC_PORT_UFP);
+	tusb320_rd_rp_disable(DISABLE_SET);
+	tusb320_soft_reset();
+	mdelay(25);
+}
+
+static void tusb320_disabled_state_exit(enum typec_port_data port_mode)
+{
+	tusb320_port_mode_set(port_mode);
+	tusb320_rd_rp_disable(DISABLE_CLEAR);
+}
+
+int set_usb_to_host(void) {
+    
+    gpiod_set_value(priv->otg_vbus_gpiod, 1);
+    disable_irq(priv->id_irq);
+    tusb320_disabled_state_start();
+    tusb320_disabled_state_exit(TYPEC_PORT_UFP);
+    enable_irq(priv->id_irq);
+
+    return 0;
+}
+
 static int tusb320_extcon_probe(struct i2c_client *client,
 				const struct i2c_device_id *id)
 {
-	struct tusb320_priv *priv;
 	int ret;
 
 	priv = devm_kzalloc(&client->dev, sizeof(*priv), GFP_KERNEL);
