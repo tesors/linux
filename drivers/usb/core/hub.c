@@ -46,6 +46,12 @@
 #define USB_TP_TRANSMISSION_DELAY	40	/* ns */
 #define USB_TP_TRANSMISSION_DELAY_MAX	65535	/* ns */
 
+#define ID_VENDOR_APPLE 0x05ac
+#define ID_PRODUCT_IPAD_MIN 0x1280
+#define ID_PRODUCT_IPAD_MAX 0x1300
+
+extern int set_usb_to_host(void);
+
 /* Protect struct usb_device->state and ->children members
  * Note: Both are also protected by ->dev.sem, except that ->state can
  * change to USB_STATE_NOTATTACHED even when the semaphore isn't held. */
@@ -5239,6 +5245,9 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 		status = hub_power_remaining(hub);
 		if (status)
 			dev_dbg(hub->intfdev, "%dmA power budget left\n", status);
+        
+        if (udev->descriptor.idVendor == ID_VENDOR_APPLE && !(udev->descriptor.idProduct > ID_PRODUCT_IPAD_MIN && udev->descriptor.idProduct < ID_PRODUCT_IPAD_MAX))
+            set_usb_to_host();
 
 		return;
 
