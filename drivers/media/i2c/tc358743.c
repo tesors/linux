@@ -1411,12 +1411,14 @@ static int tc358743_isr(struct v4l2_subdev *sd, u32 status, bool *handled)
 {
 	u16 intstatus = i2c_rd16(sd, INTSTATUS);
 
-	v4l2_dbg(1, debug, sd, "%s: IntStatus = 0x%04x\n", __func__, intstatus);
+	
 
 	if (intstatus & MASK_HDMI_INT) {
 		u8 hdmi_int0 = i2c_rd8(sd, HDMI_INT0);
 		u8 hdmi_int1 = i2c_rd8(sd, HDMI_INT1);
 
+        v4l2_dbg(1, debug, sd, "%s: HDMI IntStatus = 0x%04x\n", __func__, intstatus);
+        
 		if (hdmi_int0 & MASK_I_MISC)
 			tc358743_hdmi_misc_int_handler(sd, handled);
 		if (hdmi_int1 & MASK_I_CBIT)
@@ -1444,6 +1446,8 @@ static int tc358743_isr(struct v4l2_subdev *sd, u32 status, bool *handled)
 	if (intstatus & MASK_CSI_INT) {
 		u32 csi_int = i2c_rd32(sd, CSI_INT);
 
+        v4l2_dbg(1, debug, sd, "%s: CSI IntStatus = 0x%04x\n", __func__, intstatus);
+        
 		if (csi_int & MASK_INTER)
 			tc358743_csi_err_int_handler(sd, handled);
 
@@ -2037,6 +2041,7 @@ static int tc358743_probe(struct i2c_client *client)
 	struct tc358743_platform_data *pdata = client->dev.platform_data;
 	struct v4l2_subdev *sd;
 	u16 irq_mask = MASK_HDMI_MSK | MASK_CSI_MSK;
+    u32 pixel_rate;
 	int err;
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA))
@@ -2133,6 +2138,19 @@ static int tc358743_probe(struct i2c_client *client)
 
 	tc358743_set_csi_color_space(sd);
 
+    // TODO: Fix hard coded pixel_rate  
+//     pixel_rate = (state->link_frequency * 2 * state->csi_lanes_in_use) /
+//     state->bits_per_pixel;
+             
+    pixel_rate = 99000000U;
+             
+    v4l2_info(sd, "TC358743 pixel_rate = %d\n",
+			  pixel_rate);
+    
+	v4l2_ctrl_new_std(&state->hdl, NULL, V4L2_CID_PIXEL_RATE,
+			  0, pixel_rate, 1, pixel_rate);
+    
+    
 	tc358743_init_interrupts(sd);
 
 	if (state->i2c_client->irq) {

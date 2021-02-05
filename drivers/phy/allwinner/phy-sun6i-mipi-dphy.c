@@ -118,6 +118,7 @@ struct sun6i_dphy {
 	struct phy				*phy;
 	struct phy_configure_opts_mipi_dphy	config;
 
+    struct device       *dev;
 	int					submode;
 };
 
@@ -342,8 +343,10 @@ static int sun6i_dphy_rx_power_on(struct sun6i_dphy *dphy)
 
 	regmap_write(dphy->regs, SUN6I_DPHY_GCTL_REG,
 		     SUN6I_DPHY_GCTL_LANE_NUM(dphy->config.lanes) |
-		     SUN6I_DPHY_GCTL_EN);
-
+		     SUN6I_DPHY_GCTL_EN); 
+    
+     dev_info(dphy->dev, "DPHY RX mode clk: %d, symbol rate: %d\n", dphy_clk_rate, mipi_symbol_rate);
+    
 	return 0;
 }
 
@@ -415,6 +418,8 @@ static int sun6i_dphy_probe(struct platform_device *pdev)
 	dphy = devm_kzalloc(&pdev->dev, sizeof(*dphy), GFP_KERNEL);
 	if (!dphy)
 		return -ENOMEM;
+    
+    dphy->dev = &pdev->dev;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	regs = devm_ioremap_resource(&pdev->dev, res);

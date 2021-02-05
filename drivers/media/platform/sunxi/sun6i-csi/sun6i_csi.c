@@ -5,6 +5,8 @@
  * Author: Yong Deng <yong.deng@magewell.com>
  */
 
+#define DEBUG 1
+
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
@@ -518,7 +520,7 @@ static void sun6i_csi_set_window(struct sun6i_csi_dev *sdev)
 	u32 width = config->width;
 	u32 height = config->height;
 	u32 hor_len = width;
-
+    
 	switch (config->pixelformat) {
 	case V4L2_PIX_FMT_YUYV:
 	case V4L2_PIX_FMT_YVYU:
@@ -529,6 +531,9 @@ static void sun6i_csi_set_window(struct sun6i_csi_dev *sdev)
 		hor_len = width * 2;
 		break;
 	default:
+        dev_dbg(sdev->dev,
+			"Horizontal length should be 3 times of width for packed RGB formats!\n");
+		hor_len = sun6i_csi_get_bpp(config->pixelformat) * width / 8;
 		break;
 	}
 
@@ -570,14 +575,17 @@ static void sun6i_csi_set_window(struct sun6i_csi_dev *sdev)
 		dev_dbg(sdev->dev,
 			"Calculating pixelformat(0x%x)'s bytesperline as a packed format\n",
 			config->pixelformat);
-		bytesperline_y = (sun6i_csi_get_bpp(config->pixelformat) *
-				  config->width) / 8;
+		bytesperline_y = sun6i_csi_get_bpp(config->pixelformat) *
+				  width / 8;
 		bytesperline_c = 0;
 		planar_offset[1] = -1;
 		planar_offset[2] = -1;
 		break;
 	}
 
+    dev_dbg(sdev->dev,
+			"set_window bytesperline_y: %d height: %d hor_len:%d pixelformat: 0x%x\n", bytesperline_y, height, hor_len, config->pixelformat);
+	
 	regmap_write(sdev->regmap, CSI_CH_BUF_LEN_REG,
 		     CSI_CH_BUF_LEN_BUF_LEN_C(bytesperline_c) |
 		     CSI_CH_BUF_LEN_BUF_LEN_Y(bytesperline_y));

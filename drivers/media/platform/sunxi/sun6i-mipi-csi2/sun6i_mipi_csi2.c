@@ -4,6 +4,8 @@
  * Author: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
  */
 
+#define DEBUG 1
+
 #include <linux/clk.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
@@ -118,7 +120,9 @@ disable:
 
 		return ret;
 	}
-
+    
+    dev_dbg(cdev->dev, "MIPI CSI-2 mbus_code: %04x\n", video->mbus_code);
+    
 	switch (video->mbus_code) {
 	case MEDIA_BUS_FMT_SBGGR8_1X8:
 	case MEDIA_BUS_FMT_SGBRG8_1X8:
@@ -133,6 +137,10 @@ disable:
 	case MEDIA_BUS_FMT_SRGGB10_1X10:
 		data_type = MIPI_CSI2_DATA_TYPE_RAW10;
 		bpp = 10;
+		break;
+    case MEDIA_BUS_FMT_RGB888_1X24:
+        data_type = MIPI_CSI2_DATA_TYPE_RGB888;
+        bpp = 24;
 		break;
 	default:
 		return -EINVAL;
