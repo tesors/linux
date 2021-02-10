@@ -114,24 +114,6 @@
     status = "okay";
 };
 
-&mmc1 {
-	vmmc-supply = <&reg_vcc3v3>;
-	vqmmc-supply = <&reg_vcc3v3>;
-	mmc-pwrseq = <&wifi_pwrseq>;
-	bus-width = <4>;
-	non-removable;
-	no-1-8-v;
-	status = "okay";
-
-	brcmf: wifi@1 {
-		reg = <1>;
-		compatible = "brcm,bcm4354-sdio";
-		interrupt-parent = <&pio>;
-		interrupts = <4 24 IRQ_TYPE_LEVEL_LOW>; /* PE24 / EINT10 */
-		interrupt-names = "host-wake";
-    };
-};
-
 &mmc2 {
     non-removable;
     vmmc-supply = <&reg_vcc3v3>;
@@ -145,25 +127,6 @@
 &uart1 {
 	pinctrl-names = "default";
 	status = "okay";
-};
-
-&uart2 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&uart2_pins>, <&uart2_rts_cts_pins>;
-	uart-has-rtscts;
-	status = "okay";
-
-	bluetooth {
-		compatible = "brcm,bcm43540-bt";
-		clocks = <&rtc 1>;
-		clock-names = "lpo";
-		vbat-supply = <&reg_vcc3v3>;
-		vddio-supply = <&reg_vcc3v3>;
-		device-wakeup-gpios = <&pio 4 12 GPIO_ACTIVE_HIGH>; /* PE12 */
-		host-wakeup-gpios = <&pio 4 11 GPIO_ACTIVE_HIGH>; /* PE11 */
-		shutdown-gpios = <&pio 4 23 GPIO_ACTIVE_HIGH>; /* PE23 */
-		max-speed = <1500000>;
-	};
 };
 
 &pio {
@@ -211,47 +174,6 @@
     axp209: pmic@34 {
         compatible = "axp209-battery-power-supply";
 		reg = <0x34>;
-	};
-};
-
-&i2c1 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&i2c1_pb_pins>;
-	status = "okay";
-	tc358743: tc358743@f {
-		compatible = "toshiba,tc358743";
-		reg = <0x0f>;
-		rst-gpios = <&pio 1 11 GPIO_ACTIVE_LOW>;
-		interrupts-extended = <&pio 5 6 IRQ_TYPE_LEVEL_LOW>;
-		clocks = <&tc358743_clk>;
-		clock-names = "refclk";
-		tc358743_clk: bridge-clk {
-			compatible = "fixed-clock";
-			#clock-cells = <0>;
-			clock-frequency = <27000000>;
-		};
-		port {
-			tc358743_out: endpoint {
-				remote-endpoint = <&mipi_csi2_in_tc358743>;
-				clock-lanes = <0>;
-				data-lanes = <1 2 3 4>;
-				link-frequencies = /bits/ 64 <297000000>;
-				};
-		};
-	};
-};
-
-&mipi_csi2 {
-	status = "okay";
-	ports {
-		port@0 {
-            mipi_csi2_in_tc358743: endpoint {
-                bus-type = <4>; /* MIPI CSI-2 D-PHY */
-                clock-lanes = <0>;
-                data-lanes = <1 2 3 4>;
-                remote-endpoint = <&tc358743_out>;
-            };
-		};
 	};
 };
 
