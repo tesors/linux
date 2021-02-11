@@ -45,9 +45,8 @@
 #include "sunxi-common-regulators.dtsi"
 
 / {
-/*	model = "Allwinner V3s Generic Device";
-	compatible = "allwinner,sun8i-v3s";
-*/
+	model = "Allwinner V3s Generic Device";
+    compatible = "teso,teso-funcart-v3s", "allwinner,sun8i-v3s";
 
 	aliases {
 		serial0 = &uart2;
@@ -178,15 +177,6 @@
 
 &i2c0 {
     status = "okay";
-    bq24735: bq24735@9 {
-        compatible = "ti,bq24735";
-        reg = <0x9>;
-        ti,charge-current=<1472>;
-        ti,charge-voltage=<14592>;
-        ti,input-current=<1536>;
-        poll-interval=<20000>;
-        #ti,external-control;
-    };
     bq20z75: bq20z75@b {
         compatible = "sbs,sbs-battery";
         reg = <0xb>;
@@ -199,7 +189,16 @@
     status = "okay";
     pinctrl-names = "default";
     pinctrl-0 = <&i2c1_pins>;
-
+    
+    bq24735: bq24735@9 {
+        compatible = "ti,bq24735";
+        reg = <0x9>;
+        ti,charge-current=<1472>;
+        ti,charge-voltage=<14592>;
+        ti,input-current=<1536>;
+        poll-interval=<20000>;
+        #ti,external-control;
+    };
     usb2517: usb2517@2c {
 		compatible = "microchip,usb2517";
 		reg = <0x2c>;
