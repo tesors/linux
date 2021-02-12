@@ -78,18 +78,20 @@
 
         blue_led {
 			label = "licheepi:blue:usr";
-			gpios = <&pio 4 7 GPIO_ACTIVE_LOW>; /* PE7 */
+			gpios = <&pio 4 7 GPIO_ACTIVE_HIGH>; /* PE7 */
+			default-state = "off";
 		};
 
         green_led {
 			label = "licheepi:green:usr";
-			gpios = <&pio 4 5 GPIO_ACTIVE_LOW>; /* PE5 */
+			gpios = <&pio 4 5 GPIO_ACTIVE_HIGH>; /* PE5 */
 			default-state = "on";
 		};
 
         red_led {
 			label = "licheepi:red:usr";
-			gpios = <&pio 4 6 GPIO_ACTIVE_LOW>; /* PE6 */
+			gpios = <&pio 4 6 GPIO_ACTIVE_HIGH>; /* PE6 */
+			default-state = "on";
 		};
 	};
 };
