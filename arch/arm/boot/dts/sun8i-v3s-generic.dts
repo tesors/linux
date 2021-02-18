@@ -94,6 +94,67 @@
 			default-state = "on";
 		};
 	};
+	
+	/* Should be exported in /sys/class/gpio, but it isn't currently supported (fix in future) */
+    custom_gpio_export {
+        compatible = "gpio-leds";
+
+        usb_1_pwr {
+			label = "usb1_pwr";
+			gpios = <&pio 4 17 GPIO_ACTIVE_HIGH>; /* PE17 */
+			default-state = "off";
+		};
+
+        usb_2_pwr {
+			label = "usb2_pwr";
+			gpios = <&pio 4 16 GPIO_ACTIVE_HIGH>; /* PE16 */
+			default-state = "off";
+		};
+
+        usb_3_pwr {
+			label = "usb3_pwr";
+			gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
+			default-state = "off";
+		};
+        
+        usb_4_pwr {
+			label = "usb4_pwr";
+			gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
+			default-state = "off";
+		};
+        
+        usb_5_pwr {
+			label = "usb5_pwr";
+			gpios = <&pio 1 5 GPIO_ACTIVE_HIGH>; /* PB5 */
+			default-state = "off";
+		};
+		
+        lte_pwr {
+			label = "lte_pwr";
+			gpios = <&pio 4 14 GPIO_ACTIVE_HIGH>; /* PE14 */
+			default-state = "off";
+		};
+		
+        lte_w_disable {
+			label = "lte_w_disable";
+			gpios = <&pio 4 13 GPIO_ACTIVE_HIGH>; /* PE13 */
+			default-state = "on";
+		};
+        
+        lte_3_3v {
+			label = "lte_3_3v";
+			gpios = <&pio 4 15 GPIO_ACTIVE_HIGH>; /* PE15 */
+			default-state = "off";
+		};
+		  
+        usb_hub_rst {
+			label = "usb_hub_rst";
+			gpios = <&pio 4 20 GPIO_ACTIVE_HIGH>; /* PE20 */
+			default-state = "on";
+		};
+		
+		
+	};
 };
 
 &mmc0 {
