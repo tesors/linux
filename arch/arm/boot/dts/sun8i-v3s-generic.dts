@@ -151,7 +151,16 @@
 };
 
 &spi0 {
+    pinctrl-names = "default";
     status = "okay";
+
+    spiflash: s25fl128l@0 {
+        #address-cells = <1>;
+        #size-cells = <1>;
+        compatible = "jedec,spi-nor";
+        spi-max-frequency = <50000000>;
+        reg = <0>;
+    };
 };
 
 &pio {
