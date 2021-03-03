@@ -222,6 +222,42 @@
         compatible = "jedec,spi-nor";
         spi-max-frequency = <50000000>;
         reg = <0>;
+        
+        partitions {
+            compatible = "fixed-partitions";
+            #address-cells = <1>;
+            #size-cells = <1>;
+
+            partition@0 {
+                label = "u-boot";
+                reg = <0x000000 0x80000>;
+                read-only;
+            };
+
+	    partition@80000 {
+                label = "params";
+                reg = <0x80000 0x81000>;
+                read-only;
+            };
+
+            partition@82000 {
+                label = "dtb";
+                reg = <0x82000 0x3000>;
+                read-only;
+            };
+
+            partition@85000 {
+                label = "kernel";
+                reg = <0x85000 0x400000>;
+                read-only;
+            };
+
+            partition@490000 {
+                label = "rootfs";
+                reg = <0x490000 0x900000>;
+                read-only;
+            };
+        };
     };
 };
 
