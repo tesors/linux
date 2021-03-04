@@ -234,26 +234,37 @@
                 read-only;
             };
 
-	    partition@80000 {
-                label = "params";
-                reg = <0x80000 0x81000>;
+            partition@80000 {
+                label = "boot-mode";
+                reg = <0x80000 0x4000>;
             };
-
-            partition@82000 {
-                label = "dtb";
-                reg = <0x82000 0x3000>;
-                read-only;
+            
+            partition@84000 {
+                label = "serialnumber";
+                reg = <0x84000 0x1000>;
             };
-
+            
             partition@85000 {
-                label = "kernel";
-                reg = <0x85000 0x400000>;
+                label = "boot-script";
+                reg = <0x85000 0x1000>;
                 read-only;
             };
 
-            partition@490000 {
+            partition@86000 {
+                label = "dtb";
+                reg = <0x86000 0x3000>;
+                read-only;
+            };
+
+            partition@89000 {
+                label = "kernel";
+                reg = <0x89000 0x400000>;
+                read-only;
+            };
+
+            partition@4A0000 {
                 label = "rootfs";
-                reg = <0x490000 0x900000>;
+                reg = <0x4A0000 0xB00000>;
                 read-only;
             };
         };
