@@ -140,7 +140,7 @@ static int brcmf_c_process_clm_blob(struct brcmf_if *ifp)
 		return err;
 	}
 
-	err = firmware_request_nowarn(&clm, clm_name, bus->dev);
+	err = request_firmware_direct(&clm, clm_name, bus->dev); // Fix brcmfmac slow firmware loading mechanism
 	if (err) {
 		brcmf_info("no clm_blob available (err=%d), device may have limited channels available\n",
 			   err);
