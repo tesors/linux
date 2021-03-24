@@ -132,7 +132,7 @@
         lte_pwr {
 			label = "lte_pwr";
 			gpios = <&pio 4 14 GPIO_ACTIVE_HIGH>; /* PE14 */
-			default-state = "off";
+			default-state = "on";
 		};
 		
         lte_w_disable {
@@ -144,7 +144,7 @@
         lte_3_3v {
 			label = "lte_3_3v";
 			gpios = <&pio 4 15 GPIO_ACTIVE_HIGH>; /* PE15 */
-			default-state = "off";
+			default-state = "on";
 		};
 		  
         usb_hub_rst {
