@@ -216,7 +216,7 @@
     pinctrl-names = "default";
     status = "okay";
 
-    spiflash: s25fl128l@0 {
+    spiflash: mx25l25635e@0 {
         #address-cells = <1>;
         #size-cells = <1>;
         compatible = "jedec,spi-nor";
@@ -230,42 +230,34 @@
 
             partition@0 {
                 label = "u-boot";
-                reg = <0x000000 0x80000>;
+                reg = <0x000000 0x100000>;
                 read-only;
             };
 
-            partition@80000 {
-                label = "boot-mode";
-                reg = <0x80000 0x4000>;
-            };
-            
-            partition@84000 {
-                label = "serialnumber";
-                reg = <0x84000 0x1000>;
-            };
-            
-            partition@85000 {
-                label = "boot-script";
-                reg = <0x85000 0x1000>;
-                read-only;
+            partition@100000 {
+                label = "boot-scr";
+                reg = <0x100000 0x10000>;
             };
 
-            partition@86000 {
+	    partition@110000 {
+                label = "serial-num";
+                reg = <0x110000 0x10000>;
+            };
+            
+            partition@120000 {
                 label = "dtb";
-                reg = <0x86000 0x3000>;
-                read-only;
+                reg = <0x120000 0x10000>;
             };
-
-            partition@89000 {
+            
+            partition@130000 {
                 label = "kernel";
-                reg = <0x89000 0x400000>;
+                reg = <0x130000 0x800000>;
                 read-only;
             };
 
-            partition@4A0000 {
+            partition@930000 {
                 label = "rootfs";
-                reg = <0x4A0000 0xB00000>;
-                read-only;
+                reg = <0x930000 0x1670000>;
             };
         };
     };
