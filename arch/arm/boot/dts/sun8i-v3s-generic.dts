@@ -237,27 +237,31 @@
             partition@100000 {
                 label = "boot-scr";
                 reg = <0x100000 0x10000>;
+		read-only;
             };
 
-	    partition@110000 {
+            partition@110000 {
                 label = "serial-num";
                 reg = <0x110000 0x10000>;
+		read-only;
             };
             
             partition@120000 {
                 label = "dtb";
                 reg = <0x120000 0x10000>;
+		read-only;
             };
             
             partition@130000 {
                 label = "kernel";
-                reg = <0x130000 0x800000>;
+                reg = <0x130000 0x500000>;
                 read-only;
             };
 
             partition@930000 {
                 label = "rootfs";
-                reg = <0x930000 0x1670000>;
+                reg = <0x630000 0x1970000>;
+		read-only;
             };
         };
     };
