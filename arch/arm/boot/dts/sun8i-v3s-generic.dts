@@ -309,7 +309,7 @@
         reg = <0x9>;
         ti,charge-current=<1472>;
         ti,charge-voltage=<14592>;
-        ti,input-current=<1536>;
+        ti,input-current=<2560>;
         poll-interval=<20000>;
         #ti,external-control;
     };
