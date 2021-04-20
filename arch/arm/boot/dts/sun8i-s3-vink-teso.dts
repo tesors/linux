@@ -132,7 +132,7 @@
 &mmc2 {
     non-removable;
     vmmc-supply = <&reg_vcc3v3>;
-    bus-width = <4>;
+    bus-width = <8>;
     max-speed = <20000000>;
     mmc-ddr-3_3v;
     cap-mmc-hw-reset;
@@ -154,6 +154,31 @@
 	status = "okay";
 };
 
+&i2c0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c0_pins>;
+	status = "okay";	
+	
+    axp203: pmic@34 {
+        compatible = "x-powers,axp203", "x-powers,axp209";
+		reg = <0x34>;
+		interrupt-parent = <&gic>;
+        interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+        interrupt-controller;
+        #interrupt-cells = <1>; 
+        
+        regulators {
+            x-powers,dcdc-freq = <1500>;
+
+            reg_ldo3 {
+                regulator-min-microvolt = <3300000>;
+                regulator-max-microvolt = <3300000>;
+                regulator-name = "ldo3";
+            };
+        };
+	};
+};
+
 &i2c1 {
     pinctrl-names = "default";
     pinctrl-0 = <&i2c1_pins>;
@@ -166,6 +191,27 @@
 		interrupts-extended = <&pio 5 6 IRQ_TYPE_LEVEL_LOW>;
 		clocks = <&tc358743_clk>;
 		clock-names = "refclk";
+		
+				/* Physical dimensions of sensor */
+            physical_w = "4.713";
+            physical_h = "3.494";
+            /* Sensor Model */
+            sensor_model ="tc358743";
+            
+   
+
+            ddc5v_delay = <2>;
+            enable_hdcp = "false";
+            lineinitcnt = <0xe80>;
+            lptxtimecnt = <0x003>;
+            tclk_headercnt = <0x1403>;
+            tclk_trailcnt = <0x00>;
+            ths_headercnt = <0x0103>;
+            twakeup = <0x4882>;
+            tclk_postcnt = <0x008>;
+            ths_trailcnt = <0x02>;
+            hstxvregcnt = <0>;
+		
 		tc358743_clk: bridge-clk {
 			compatible = "fixed-clock";
 			#clock-cells = <0>;
@@ -175,9 +221,12 @@
 		port {
 			tc358743_out: endpoint {
                 remote-endpoint = <&mipi_csi2_in>;
-                clock-lanes = <0>;
-				data-lanes = <1 2 3 4>;
-				link-frequencies = /bits/ 64 <297000000>;
+                port-index = <0>; /* CSI A */
+                        bus-width = <2>; 
+                        data-lanes = <1 2 3 4>;
+                        clock-lanes = <0>;
+                        clock-noncontinuous;
+                        link-frequencies = /bits/ 64 <297000000>;
 				};
         };
     };

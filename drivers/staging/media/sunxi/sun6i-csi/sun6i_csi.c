@@ -507,6 +507,9 @@ static void sun6i_csi_set_window(struct sun6i_csi_dev *sdev)
 	u32 width = config->width;
 	u32 height = config->height;
 	u32 hor_len = width;
+    
+    dev_dbg(sdev->dev,
+			"milicaaaa config->pixelformat %x!\n", config->pixelformat);
 
 	switch (config->pixelformat) {
 	case V4L2_PIX_FMT_YUYV:
@@ -900,14 +903,6 @@ static int sun6i_csi_resource_request(struct sun6i_csi_dev *sdev,
 	return 0;
 }
 
-/*
- * PHYS_OFFSET isn't available on all architectures. In order to
- * accommodate for COMPILE_TEST, let's define it to something dumb.
- */
-#if defined(CONFIG_COMPILE_TEST) && !defined(PHYS_OFFSET)
-#define PHYS_OFFSET 0
-#endif
-
 static int sun6i_csi_probe(struct platform_device *pdev)
 {
 	struct sun6i_csi_dev *sdev;
@@ -918,8 +913,6 @@ static int sun6i_csi_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	sdev->dev = &pdev->dev;
-	/* The DMA bus has the memory mapped at 0 */
-	sdev->dev->dma_pfn_offset = PHYS_OFFSET >> PAGE_SHIFT;
 
 	ret = sun6i_csi_resource_request(sdev, pdev);
 	if (ret)
