@@ -539,7 +539,7 @@ static void sun6i_csi_set_window(struct sun6i_csi_dev *sdev)
 	case V4L2_PIX_FMT_NV16:
 	case V4L2_PIX_FMT_NV61:
 		bytesperline_y = width;
-		bytesperline_c = width;
+		bytesperline_c = width / 2;
 		planar_offset[1] = bytesperline_y * height;
 		planar_offset[2] = -1;
 		break;
@@ -552,6 +552,13 @@ static void sun6i_csi_set_window(struct sun6i_csi_dev *sdev)
 				bytesperline_c * height / 2;
 		break;
 	case V4L2_PIX_FMT_YUV422P:
+		bytesperline_y = width;
+		bytesperline_c = width / 4;
+		planar_offset[1] = bytesperline_y * height;
+		planar_offset[2] = planar_offset[1] +
+				bytesperline_c * height;
+		break;
+    case V4L2_PIX_FMT_RGB24:
 		bytesperline_y = width;
 		bytesperline_c = width / 2;
 		planar_offset[1] = bytesperline_y * height;

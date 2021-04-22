@@ -192,26 +192,6 @@
 		clocks = <&tc358743_clk>;
 		clock-names = "refclk";
 		
-				/* Physical dimensions of sensor */
-            physical_w = "4.713";
-            physical_h = "3.494";
-            /* Sensor Model */
-            sensor_model ="tc358743";
-            
-   
-
-            ddc5v_delay = <2>;
-            enable_hdcp = "false";
-            lineinitcnt = <0xe80>;
-            lptxtimecnt = <0x003>;
-            tclk_headercnt = <0x1403>;
-            tclk_trailcnt = <0x00>;
-            ths_headercnt = <0x0103>;
-            twakeup = <0x4882>;
-            tclk_postcnt = <0x008>;
-            ths_trailcnt = <0x02>;
-            hstxvregcnt = <0>;
-		
 		tc358743_clk: bridge-clk {
 			compatible = "fixed-clock";
 			#clock-cells = <0>;
