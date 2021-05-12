@@ -58,12 +58,12 @@
         resets = <&ccu RST_BUS_VE>;
         interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
         allwinner,sram = <&ve_sram 1>;
-        status = "disabled";
+        status = "okay";
     };
         
     ion: ion {
         compatible = "allwinner,sunxi-ion";
-        status = "disabled";
+        status = "okay";
         heap_cma@0{
             compatible = "allwinner,cma";
             heap-name  = "cma";
@@ -132,7 +132,7 @@
 &mmc2 {
     non-removable;
     vmmc-supply = <&reg_vcc3v3>;
-    bus-width = <8>;
+    bus-width = <4>;
     max-speed = <20000000>;
     mmc-ddr-3_3v;
     cap-mmc-hw-reset;
