@@ -627,7 +627,7 @@ int sun6i_video_init(struct sun6i_video *video, struct sun6i_csi *csi,
 
 	/* Initialize videobuf2 queue */
 	vidq->type			= V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	vidq->io_modes			= VB2_MMAP | VB2_DMABUF;
+	vidq->io_modes			= VB2_USERPTR | VB2_MMAP | VB2_DMABUF;
 	vidq->drv_priv			= video;
 	vidq->buf_struct_size		= sizeof(struct sun6i_csi_buffer);
 	vidq->ops			= &sun6i_csi_vb2_ops;

@@ -124,6 +124,8 @@ source "drivers/dma/Kconfig"
 
 source "drivers/dma-buf/Kconfig"
 
+source "drivers/udmabuf/Kconfig"
+
 source "drivers/dca/Kconfig"
 
 source "drivers/auxdisplay/Kconfig"
