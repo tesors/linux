@@ -196,6 +196,12 @@
                 };
             };
         };
+    
+    udmabuf@0x00 {
+		compatible = "ikwzm,u-dma-buf";
+		device-name = "udmabuf0";
+		size = <0x00BDE000>;
+    };
 };
 
 &emac {
@@ -298,24 +304,24 @@
         otg-vbus-gpios = <&pio 3 9 GPIO_ACTIVE_LOW>; /* PD9 */
     };	
 	
-    axp203: pmic@34 {
-        compatible = "x-powers,axp203", "x-powers,axp209";
-		reg = <0x34>;
-		interrupt-parent = <&gic>;
-        interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-        interrupt-controller;
-        #interrupt-cells = <1>; 
+//    axp203: pmic@34 {
+//        compatible = "x-powers,axp203", "x-powers,axp209";
+//		reg = <0x34>;
+//		interrupt-parent = <&gic>;
+//        interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+//        interrupt-controller;
+//        #interrupt-cells = <1>; 
        	
-        regulators {
-            x-powers,dcdc-freq = <1500>;
+//        regulators {
+//            x-powers,dcdc-freq = <1500>;
 
-            reg_ldo3 {
-                regulator-min-microvolt = <3300000>;
-                regulator-max-microvolt = <3300000>;
-                regulator-name = "ldo3";
-            };
-        };
-	};
+//            reg_ldo3 {
+//                regulator-min-microvolt = <3300000>;
+//                regulator-max-microvolt = <3300000>;
+//                regulator-name = "ldo3";
+//            };
+//        };
+//	};
 };
 
 &i2c1 {
