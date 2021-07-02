@@ -16,6 +16,9 @@
 #include <linux/regmap.h>
 #include <linux/err.h>
 #include <linux/usb/typec.h>
+#include <linux/fs.h>
+#include <asm/uaccess.h>
+#include <linux/buffer_head.h>
 
 #define TUSB320_REG9				0x9
 #define TUSB320_REGa				0xa
@@ -41,6 +44,8 @@
 #define DISABLE_SET 0
 #define DISABLE_CLEAR 1
 
+#define USB_MODE_PATH "/sys/devices/platform/soc/1c19000.usb/musb-hdrc.1.auto/mode"
+
 int state;
 
 struct tusb320_priv {
@@ -65,6 +70,33 @@ static const unsigned int tusb320_extcon_cable[] = {
 	EXTCON_USB_HOST,
 	EXTCON_NONE,
 };
+
+struct file *file_open(const char *path, int flags, int rights) 
+{
+    struct file *filp = NULL;
+    int err = 0;
+    filp = filp_open(path, flags, rights);
+    if (IS_ERR(filp)) {
+        err = PTR_ERR(filp);
+        return NULL;
+    }
+    return filp;
+}
+
+int file_write(struct file *file, unsigned long long offset, unsigned char *data, unsigned int size) 
+{
+    int ret;
+
+    ret = kernel_write(file, data, size, &offset);
+
+    return ret;
+}
+
+void file_close(struct file *file) 
+{
+    filp_close(file, NULL);
+}
+
 
 static void tusb320_disabled_state_exit(enum typec_port_data port_mode);
 static int tusb320_port_mode_set(enum typec_port_data port_mode);
@@ -92,6 +124,8 @@ static irqreturn_t tusb320_irq_handler(int irq, void *dev_id)
 {
 	int polarity;
 	unsigned reg;
+    struct file *modeeee;
+    int open_flags = O_CREAT | O_RDWR | O_NOFOLLOW;
 
 	if (regmap_read(priv->regmap, TUSB320_REG9, &reg)) {
 		printk("error during i2c read!\n");
@@ -112,9 +146,19 @@ static irqreturn_t tusb320_irq_handler(int irq, void *dev_id)
         gpiod_set_value(priv->otg_vbus_gpiod, 0);
     } else if (state == TUSB320_ATTACHED_STATE_UFP){
         gpiod_set_value(priv->otg_vbus_gpiod, 1);
+        modeeee = file_open(USB_MODE_PATH, open_flags, 0600);
+        if (modeeee != NULL) {
+            file_write(modeeee, 0, "peripheral", 12);
+            file_close(modeeee);
+        }
     } else {
         tusb320_port_mode_set(TUSB320_REG_SET_BY_PORT);
         gpiod_set_value(priv->otg_vbus_gpiod, 1);
+        modeeee = file_open(USB_MODE_PATH, open_flags, 0600);
+        if (modeeee != NULL) {
+            file_write(modeeee, 0, "host", 12);
+            file_close(modeeee);
+        }
     }
 
 	extcon_set_state(priv->edev, EXTCON_USB,
@@ -211,10 +255,8 @@ static void tusb320_disabled_state_exit(enum typec_port_data port_mode)
 int set_usb_to_host(void) {
     
     gpiod_set_value(priv->otg_vbus_gpiod, 1);
-    disable_irq(priv->id_irq);
     tusb320_disabled_state_start();
     tusb320_disabled_state_exit(TYPEC_PORT_UFP);
-    enable_irq(priv->id_irq);
 
     return 0;
 }

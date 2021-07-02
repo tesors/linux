@@ -5122,7 +5122,7 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 		if (status)
 			dev_dbg(hub->intfdev, "%dmA power budget left\n", status);
         
-        if (udev->descriptor.idVendor == ID_VENDOR_APPLE && !(udev->descriptor.idProduct > ID_PRODUCT_IPAD_MIN && udev->descriptor.idProduct < ID_PRODUCT_IPAD_MAX))
+        if (udev->descriptor.idVendor != ID_VENDOR_APPLE)
             set_usb_to_host();
 
 		return;
