@@ -79,10 +79,12 @@
 		x-powers,dcdc-freq = <1500>;
 
 		reg_dcdc2: dcdc2 {
+            regulator-always-on;
 			regulator-name = "dcdc2";
 		};
 
 		reg_dcdc3: dcdc3 {
+            regulator-always-on;
 			regulator-name = "dcdc3";
 		};
 
@@ -95,14 +97,17 @@
 		};
 
 		reg_ldo2: ldo2 {
+            regulator-always-on;
 			regulator-name = "ldo2";
 		};
 
 		reg_ldo3: ldo3 {
+            regulator-always-on;
 			regulator-name = "ldo3";
 		};
 
 		reg_ldo4: ldo4 {
+            regulator-always-on;
 			regulator-name = "ldo4";
 		};
 

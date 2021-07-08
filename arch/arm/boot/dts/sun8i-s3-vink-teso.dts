@@ -297,31 +297,27 @@
 	pinctrl-0 = <&i2c0_pins>;
 	status = "okay";
 	
+	axp209: pmic@34 {
+        compatible = "x-powers,axp20x-battery-power-supply", "x-powers,axp209";
+		reg = <0x34>;
+		interrupt-parent = <&gic>;
+        interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+        interrupt-controller;
+        #interrupt-cells = <1>; 
+	};
+	
     typec_tusb320:tusb320@60 {
         compatible = "ti,tusb320";
         reg = <0x60>;
         int-gpios = <&pio 1 10 GPIO_ACTIVE_LOW>; /* PB10 */
         otg-vbus-gpios = <&pio 3 9 GPIO_ACTIVE_LOW>; /* PD9 */
     };	
-	
-//    axp203: pmic@34 {
-//        compatible = "x-powers,axp203", "x-powers,axp209";
-//		reg = <0x34>;
-//		interrupt-parent = <&gic>;
-//        interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-//        interrupt-controller;
-//        #interrupt-cells = <1>; 
-       	
-//        regulators {
-//            x-powers,dcdc-freq = <1500>;
+};
 
-//            reg_ldo3 {
-//                regulator-min-microvolt = <3300000>;
-//                regulator-max-microvolt = <3300000>;
-//                regulator-name = "ldo3";
-//            };
-//        };
-//	};
+#include "axp209.dtsi"
+
+&battery_power_supply {
+	status = "okay";
 };
 
 &i2c1 {
