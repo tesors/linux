@@ -277,7 +277,7 @@ static int tusb320_extcon_probe(struct i2c_client *client,
 		return -ENODEV;
 	}
 	
-    priv->otg_vbus_gpiod = devm_gpiod_get(priv->dev, "otg-vbus", GPIOD_OUT_LOW);
+    priv->otg_vbus_gpiod = devm_gpiod_get(priv->dev, "otg-vbus", GPIOD_OUT_HIGH);
     if (IS_ERR(priv->otg_vbus_gpiod)) {
 		dev_err(priv->dev, "failed to get otg-vbus gpio\n");
 		return -ENODEV;
