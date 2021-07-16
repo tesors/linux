@@ -1,0 +1,186 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2019 Icenowy Zheng <icenowy@aosc.io>
+ */
+
+/dts-v1/;
+#include "sun8i-v3.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+
+/ {
+	model = "Vinke Teso S3";
+	compatible = "sipeed,lichee-zero-plus", "sochip,s3",
+		     "allwinner,sun8i-v3";
+
+	aliases {
+		serial0 = &uart1;
+		serial1 = &uart2;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+	
+    leds {
+		compatible = "gpio-leds";
+		
+		blue1_led {
+			label = "licheepi:blue:usr";
+			gpios = <&pio 3 4 GPIO_ACTIVE_LOW>; /* PD4 */
+		};
+
+		green1_led {
+			label = "licheepi:green:usr";
+			gpios = <&pio 4 16 GPIO_ACTIVE_LOW>; /* PE16 */
+			default-state = "on";
+		};
+
+		red1_led {
+			label = "licheepi:red:usr";
+			gpios = <&pio 4 2 GPIO_ACTIVE_LOW>; /* PE2 */
+		};
+		
+        blue2_led {
+			label = "licheepi:blue:usr";
+			gpios = <&pio 3 11 GPIO_ACTIVE_LOW>; /* PD11 */
+		};
+
+		green2_led {
+			label = "licheepi:green:usr";
+			gpios = <&pio 3 8 GPIO_ACTIVE_LOW>; /* PD8 */
+			default-state = "on";
+		};
+
+		red2_led {
+			label = "licheepi:red:usr";
+			gpios = <&pio 3 10 GPIO_ACTIVE_LOW>; /* PD10 */
+		};
+		
+//        blue3_led {
+//			label = "licheepi:blue:usr";
+//			gpios = <&pio 1 10 GPIO_ACTIVE_LOW>; /* PB10 */
+//		};
+//
+//		green3_led {
+//			label = "licheepi:green:usr";
+//			gpios = <&pio 1 6 GPIO_ACTIVE_LOW>; /* PB6 */
+//			default-state = "on";
+//		};
+//
+//		red3_led {
+//			label = "licheepi:red:usr";
+//			gpios = <&pio 1 7 GPIO_ACTIVE_LOW>; /* PB7 */
+//		};
+		
+        blue4_led {
+			label = "licheepi:blue:usr";
+			gpios = <&pio 3 16 GPIO_ACTIVE_LOW>; /* PD16 */
+		};
+
+		green4_led {
+			label = "licheepi:green:usr";
+			gpios = <&pio 3 14 GPIO_ACTIVE_LOW>; /* PD14 */
+			default-state = "on";
+		};
+
+		red4_led {
+			label = "licheepi:red:usr";
+			gpios = <&pio 3 15 GPIO_ACTIVE_LOW>; /* PD15 */
+		};
+	};
+
+	reg_vcc3v3: vcc3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc3v3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+	wifi_pwrseq: wifi_pwrseq {
+		compatible = "mmc-pwrseq-simple";
+		reset-gpios = <&pio 3 2 GPIO_ACTIVE_LOW>; /* PD2 */
+		clocks = <&rtc 1>;
+		clock-names = "ext_clock";
+	};
+	
+
+};
+
+&emac {
+    phy-handle = <&int_mii_phy>;
+    phy-mode = "mii";
+    allwinner,use-internal-phy;
+    status = "okay";
+};
+
+&mmc2 {
+    non-removable;
+    vmmc-supply = <&reg_vcc3v3>;
+    bus-width = <4>;
+    max-speed = <20000000>;
+    mmc-ddr-3_3v;
+    cap-mmc-hw-reset;
+    status = "okay";
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&pio {
+    uart2_pins: uart2-pins {
+		pins = "PB0", "PB1";
+		function = "uart2";
+	};
+	
+	uart2_rts_cts_pins: uart2-rts-cts-pins {
+		pins = "PB2", "PB3";
+		function = "uart2";
+	};
+};
+
+&usb_otg {
+	dr_mode = "otg";
+	status = "okay";
+};
+
+&usbphy {
+	status = "okay";
+};
+
+&ehci0 {
+    status = "okay";
+};
+
+&ohci0 {
+    status = "okay";
+};
+
+&i2c0 {
+    clock-frequency = <100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c0_pins>;
+	status = "okay";
+	
+    typec_tusb320:tusb320@60 {
+        compatible = "ti,tusb320";
+        reg = <0x60>;
+        int-gpios = <&pio 1 10 GPIO_ACTIVE_LOW>; /* PB10 */
+        otg-vbus-gpios = <&pio 3 9 GPIO_ACTIVE_LOW>; /* PD9 */
+    };
+    
+    axp209: pmic@34 {
+        compatible = "axp209-battery-power-supply";
+		reg = <0x34>;
+	};
+};
+
+&csi0 {
+	status = "okay";
+};
+
+&dphy {
+	status = "okay";
+};
