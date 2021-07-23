@@ -298,12 +298,18 @@
 	status = "okay";
 	
 	axp209: pmic@34 {
-        compatible = "x-powers,axp20x-battery-power-supply", "x-powers,axp209";
+        compatible = "x-powers,axp209";
 		reg = <0x34>;
 		interrupt-parent = <&gic>;
         interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
         interrupt-controller;
         #interrupt-cells = <1>; 
+        
+        axp_gpio: gpio {
+            compatible = "x-powers,axp209-gpio";
+            gpio-controller;
+            #gpio-cells = <2>;
+        };
 	};
 	
     typec_tusb320:tusb320@60 {
@@ -318,6 +324,13 @@
 
 &battery_power_supply {
 	status = "okay";
+};
+
+&axp_gpio {
+	gpio1_adc: gpio1-adc {
+		pins = "GPIO1";
+		function = "adc";
+	};
 };
 
 &i2c1 {

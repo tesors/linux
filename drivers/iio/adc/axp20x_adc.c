@@ -690,6 +690,9 @@ static int axp20x_probe(struct platform_device *pdev)
 
 	/* Enable the ADCs on IP */
 	regmap_write(info->regmap, AXP20X_ADC_EN1, info->data->adc_en1_mask);
+    
+    /* Enable the ADCs on GPIO1 */
+	regmap_write(info->regmap, AXP20X_GPIO1_CTRL, 0x4);
 
 	if (info->data->adc_en2)
 		/* Enable GPIO0/1 and internal temperature ADCs */
