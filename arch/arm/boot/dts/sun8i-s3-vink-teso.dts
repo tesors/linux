@@ -229,6 +229,14 @@
     };
 };
 
+&codec {
+	allwinner,audio-routing =
+		"LINEIN", "Line In",
+		"MIC1",	"MBIAS",
+		"MIC1", "Mic";
+	status = "okay";
+};
+
 &mmc2 {
     non-removable;
     vmmc-supply = <&reg_vcc3v3>;
@@ -264,6 +272,9 @@
 };
 
 &pio {
+
+    gpios = <&pio 3 3 GPIO_ACTIVE_LOW>; /* PD3 -- BAL_IN_EN */
+
     uart2_pins: uart2-pins {
 		pins = "PB0", "PB1";
 		function = "uart2";
