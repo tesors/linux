@@ -45,14 +45,15 @@
 #define DISABLE_CLEAR 1
 
 #define USB_MODE_PATH "/sys/devices/platform/soc/1c19000.usb/musb-hdrc.1.auto/mode"
-
+#define LTE_MODEM_STATUS_PATH "/sys/class/leds/vbus_det/brightness"
+#define USB_DRV_PATH "/sys/class/leds/usb_drv/brightness"
 int state;
 
 struct tusb320_priv {
 	struct device *dev;
 	struct regmap *regmap;
 	struct extcon_dev *edev;
-    struct gpio_desc *irq_gpiod, *otg_vbus_gpiod;
+    struct gpio_desc *irq_gpiod;
     int id_irq;
 };
 
@@ -92,9 +93,35 @@ int file_write(struct file *file, unsigned long long offset, unsigned char *data
     return ret;
 }
 
+int file_read(struct file *file, unsigned long long offset, unsigned char *data, unsigned int size)
+{
+    int ret;
+
+    ret = kernel_read(file, data, size, &offset);
+
+    return ret;
+}
+
 void file_close(struct file *file) 
 {
     filp_close(file, NULL);
+}
+
+void write_usb_drv(int enable_5V_USB){
+    struct file *usb_drv_status;
+    int open_flags = O_CREAT | O_RDWR | O_NOFOLLOW;
+
+    //usb_drv pin gives 5V to USB if set to 1
+    usb_drv_status = file_open(USB_DRV_PATH, open_flags, 0600);
+
+    if (usb_drv_status != NULL) {
+        if (enable_5V_USB)
+            file_write(usb_drv_status, 0, "255", 12);
+        else
+            file_write(usb_drv_status, 0, "0", 12);
+
+        file_close(usb_drv_status);
+    }
 }
 
 
@@ -124,8 +151,10 @@ static irqreturn_t tusb320_irq_handler(int irq, void *dev_id)
 {
 	int polarity;
 	unsigned reg;
-    struct file *modeeee;
+    struct file *modeeee, *lte_modem_status;
     int open_flags = O_CREAT | O_RDWR | O_NOFOLLOW;
+    int lte_file_flags = O_RDONLY | O_NOFOLLOW;
+    char *buffer;
 
 	if (regmap_read(priv->regmap, TUSB320_REG9, &reg)) {
 		printk("error during i2c read!\n");
@@ -142,10 +171,23 @@ static irqreturn_t tusb320_irq_handler(int irq, void *dev_id)
 	printk("attached state: %s, polarity: %d\n",
 		tusb_attached_states[state], polarity);
     
+    //if LTE modem is on, CPU acts like device. This part of code prevents
+    // CPU going to host mode when android is plugged in
+    //We know that LTE modem is on if 255 is written in file /sys/class/leds/vbus_det/brightness
+    buffer = kmalloc(10, GFP_KERNEL);
+    lte_modem_status = file_open(LTE_MODEM_STATUS_PATH, lte_file_flags, 0600);
+    if (lte_modem_status != NULL) {
+            file_read(lte_modem_status, 0, buffer, 3);
+            file_close(lte_modem_status);
+            if ((buffer[0] == 0x32) && (buffer[1] == 0x35) && (buffer[2] == 0x35)){
+                state = TUSB320_ATTACHED_STATE_DFP;
+            }
+    }
+
     if (state == TUSB320_ATTACHED_STATE_DFP || state == TUSB320_ATTACHED_STATE_ACC) {
-        gpiod_set_value(priv->otg_vbus_gpiod, 0);
+        write_usb_drv(1);
     } else if (state == TUSB320_ATTACHED_STATE_UFP){
-        gpiod_set_value(priv->otg_vbus_gpiod, 1);
+        write_usb_drv(0);
         modeeee = file_open(USB_MODE_PATH, open_flags, 0600);
         if (modeeee != NULL) {
             file_write(modeeee, 0, "peripheral", 12);
@@ -153,7 +195,7 @@ static irqreturn_t tusb320_irq_handler(int irq, void *dev_id)
         }
     } else {
         tusb320_port_mode_set(TUSB320_REG_SET_BY_PORT);
-        gpiod_set_value(priv->otg_vbus_gpiod, 1);
+        write_usb_drv(0);
         modeeee = file_open(USB_MODE_PATH, open_flags, 0600);
         if (modeeee != NULL) {
             file_write(modeeee, 0, "host", 12);
@@ -177,6 +219,7 @@ static irqreturn_t tusb320_irq_handler(int irq, void *dev_id)
 
 	regmap_write(priv->regmap, TUSB320_REG9, reg);
 
+    kfree(buffer);
 	return IRQ_HANDLED;
 }
 
@@ -253,8 +296,7 @@ static void tusb320_disabled_state_exit(enum typec_port_data port_mode)
 }
 
 int set_usb_to_host(void) {
-    
-    gpiod_set_value(priv->otg_vbus_gpiod, 1);
+    write_usb_drv(0);
     tusb320_disabled_state_start();
     tusb320_disabled_state_exit(TYPEC_PORT_UFP);
 
@@ -277,11 +319,6 @@ static int tusb320_extcon_probe(struct i2c_client *client,
 		return -ENODEV;
 	}
 	
-    priv->otg_vbus_gpiod = devm_gpiod_get(priv->dev, "otg-vbus", GPIOD_OUT_HIGH);
-    if (IS_ERR(priv->otg_vbus_gpiod)) {
-		dev_err(priv->dev, "failed to get otg-vbus gpio\n");
-		return -ENODEV;
-	}
     
     priv->id_irq = gpiod_to_irq(priv->irq_gpiod);
     if (priv->id_irq < 0) {

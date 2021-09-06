@@ -116,7 +116,12 @@
         vbus_det {
 			label = "vbus_det";
             gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 -- VBUS_DET */
-			default-state = "on";
+			default-state = "off";
+		};
+        usb_drv {
+			label = "usb_drv";
+            gpios  = <&pio 3 9 GPIO_ACTIVE_HIGH>; /* PD9 */
+			default-state = "off";
 		};
 	};
 
@@ -355,7 +360,6 @@
         compatible = "ti,tusb320";
         reg = <0x60>;
         int-gpios = <&pio 1 10 GPIO_ACTIVE_LOW>; /* PB10 */
-        otg-vbus-gpios = <&pio 3 9 GPIO_ACTIVE_LOW>; /* PD9 */
     };
 
     usb2422: usb2422@2c {
