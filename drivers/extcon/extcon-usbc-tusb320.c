@@ -153,7 +153,7 @@ static irqreturn_t tusb320_irq_handler(int irq, void *dev_id)
 	unsigned reg;
     struct file *modeeee, *lte_modem_status;
     int open_flags = O_CREAT | O_RDWR | O_NOFOLLOW;
-    int lte_file_flags = O_RDONLY | O_NOFOLLOW;
+    int lte_file_flags =  O_CREAT | O_RDWR | O_NOFOLLOW;
     char *buffer;
 
 	if (regmap_read(priv->regmap, TUSB320_REG9, &reg)) {
