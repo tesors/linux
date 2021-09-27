@@ -274,7 +274,7 @@
     non-removable;
     vmmc-supply = <&reg_vcc3v3>;
     bus-width = <4>;
-    max-speed = <20000000>;
+    max-speed = <10000000>;
     mmc-ddr-3_3v;
     cap-mmc-hw-reset;
     status = "okay";
