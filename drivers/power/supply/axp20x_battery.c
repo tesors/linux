@@ -631,6 +631,7 @@ static int axp20x_power_probe(struct platform_device *pdev)
 					   &axp20x_batt->max_ccc);
     
     regmap_write(axp20x_batt->regmap, AXP20X_VBUS_IPSOUT_MGMT, 0x63);
+    regmap_write(axp20x_batt->regmap, AXP20X_DCDC2_V_OUT, 0x17);
 
 	return 0;
 }
