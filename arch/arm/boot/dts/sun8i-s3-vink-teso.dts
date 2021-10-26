@@ -233,7 +233,7 @@
     udmabuf@0x00 {
 		compatible = "ikwzm,u-dma-buf";
 		device-name = "udmabuf0";
-		size = <0x00BDE000>;
+		size = <0x008E7000>;
     };
 };
 
