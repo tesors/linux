@@ -233,7 +233,7 @@
     udmabuf@0x00 {
 		compatible = "ikwzm,u-dma-buf";
 		device-name = "udmabuf0";
-		size = <0x00BDE000>;
+		size = <0x008E7000>;
     };
 };
 
@@ -274,7 +274,7 @@
     non-removable;
     vmmc-supply = <&reg_vcc3v3>;
     bus-width = <4>;
-    max-speed = <20000000>;
+    max-speed = <50000000>;
     mmc-ddr-3_3v;
     cap-mmc-hw-reset;
     status = "okay";
