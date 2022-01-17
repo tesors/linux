@@ -123,6 +123,12 @@
             gpios  = <&pio 3 9 GPIO_ACTIVE_HIGH>; /* PD9 */
 			default-state = "off";
 		};
+		
+		wifi_en {
+			label = "wifi_en";
+            gpios  = <&pio 4 21 GPIO_ACTIVE_HIGH>; /* PE21 */
+			default-state = "on";
+		};
 	};
 
 	reg_vcc3v3: vcc3v3 {
