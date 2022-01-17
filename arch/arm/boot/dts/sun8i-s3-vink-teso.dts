@@ -273,7 +273,7 @@
 &mmc2 {
     non-removable;
     vmmc-supply = <&reg_vcc3v3>;
-    bus-width = <4>;
+    bus-width = <8>;
     max-speed = <50000000>;
     mmc-ddr-3_3v;
     cap-mmc-hw-reset;
