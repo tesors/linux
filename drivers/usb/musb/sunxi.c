@@ -614,7 +614,7 @@ static const struct musb_platform_ops sunxi_musb_ops = {
 };
 
 /* Allwinner OTG supports up to 5 endpoints */
-#define SUNXI_MUSB_MAX_EP_NUM	6
+#define SUNXI_MUSB_MAX_EP_NUM	5
 #define SUNXI_MUSB_RAM_BITS	11
 
 static struct musb_fifo_cfg sunxi_musb_mode_cfg[] = {
@@ -622,26 +622,19 @@ static struct musb_fifo_cfg sunxi_musb_mode_cfg[] = {
 	MUSB_EP_FIFO_SINGLE(1, FIFO_RX, 512),
 	MUSB_EP_FIFO_SINGLE(2, FIFO_TX, 512),
 	MUSB_EP_FIFO_SINGLE(2, FIFO_RX, 512),
-	MUSB_EP_FIFO_SINGLE(3, FIFO_TX, 512),
-	MUSB_EP_FIFO_SINGLE(3, FIFO_RX, 512),
-	MUSB_EP_FIFO_SINGLE(4, FIFO_TX, 512),
-	MUSB_EP_FIFO_SINGLE(4, FIFO_RX, 512),
-	MUSB_EP_FIFO_SINGLE(5, FIFO_TX, 512),
-	MUSB_EP_FIFO_SINGLE(5, FIFO_RX, 512),
+	MUSB_EP_FIFO_SINGLE(3, FIFO_RXTX, 960),
+	MUSB_EP_FIFO_SINGLE(4, FIFO_RXTX, 1024),
+
 };
 
 /* H3/V3s OTG supports only 4 endpoints */
-#define SUNXI_MUSB_MAX_EP_NUM_H3	5
+#define SUNXI_MUSB_MAX_EP_NUM_H3	4
 
 static struct musb_fifo_cfg sunxi_musb_mode_cfg_h3[] = {
-	MUSB_EP_FIFO_SINGLE(1, FIFO_TX, 512),
+    MUSB_EP_FIFO_SINGLE(1, FIFO_TX, 512),
 	MUSB_EP_FIFO_SINGLE(1, FIFO_RX, 512),
-	MUSB_EP_FIFO_SINGLE(2, FIFO_TX, 512),
-	MUSB_EP_FIFO_SINGLE(2, FIFO_RX, 512),
-	MUSB_EP_FIFO_SINGLE(3, FIFO_TX, 512),
-	MUSB_EP_FIFO_SINGLE(3, FIFO_RX, 512),
-	MUSB_EP_FIFO_SINGLE(4, FIFO_TX, 512),
-	MUSB_EP_FIFO_SINGLE(4, FIFO_RX, 512),
+	MUSB_EP_FIFO_SINGLE(2, FIFO_RXTX, 1024),
+	MUSB_EP_FIFO_SINGLE(3, FIFO_RXTX, 1024),
 };
 
 static const struct musb_hdrc_config sunxi_musb_hdrc_config = {
