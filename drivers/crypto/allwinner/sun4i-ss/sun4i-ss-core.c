@@ -13,7 +13,6 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <crypto/scatterwalk.h>
 #include <linux/scatterlist.h>
@@ -22,18 +21,6 @@
 #include <linux/reset.h>
 
 #include "sun4i-ss.h"
-
-static const struct ss_variant ss_a10_variant = {
-	.sha1_in_be = false,
-};
-
-static const struct ss_variant ss_a33_variant = {
-	.sha1_in_be = true,
-};
-
-static const struct ss_variant ss_v3s_variant = {
-	.sha1_in_be = true,
-};
 
 static struct sun4i_ss_alg_template ss_algs[] = {
 {       .type = CRYPTO_ALG_TYPE_AHASH,
@@ -286,7 +273,7 @@ err_enable:
 	return err;
 }
 
-static const struct dev_pm_ops sun4i_ss_pm_ops = {
+const struct dev_pm_ops sun4i_ss_pm_ops = {
 	SET_RUNTIME_PM_OPS(sun4i_ss_pm_suspend, sun4i_ss_pm_resume, NULL)
 };
 
@@ -334,12 +321,6 @@ static int sun4i_ss_probe(struct platform_device *pdev)
 	if (IS_ERR(ss->base)) {
 		dev_err(&pdev->dev, "Cannot request MMIO\n");
 		return PTR_ERR(ss->base);
-	}
-
-	ss->variant = of_device_get_match_data(&pdev->dev);
-	if (!ss->variant) {
-		dev_err(&pdev->dev, "Missing Security System variant\n");
-		return -EINVAL;
 	}
 
 	ss->ssclk = devm_clk_get(&pdev->dev, "mod");
@@ -503,15 +484,9 @@ static int sun4i_ss_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id a20ss_crypto_of_match_table[] = {
-	{ .compatible = "allwinner,sun4i-a10-crypto",
-	  .data = &ss_a10_variant
-	},
-	{ .compatible = "allwinner,sun8i-a33-crypto",
-	  .data = &ss_a33_variant
-	},
-	{ .compatible = "allwinner,sun8i-v3s-crypto",
-      .data = &ss_v3s_variant
-	},
+	{ .compatible = "allwinner,sun4i-a10-crypto" },
+    { .compatible = "allwinner,sun8i-a33-crypto" },
+    { .compatible = "allwinner,sun8i-v3s-crypto" },
 	{}
 };
 MODULE_DEVICE_TABLE(of, a20ss_crypto_of_match_table);
