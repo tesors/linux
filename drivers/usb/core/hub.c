@@ -43,10 +43,13 @@
 #define USB_TP_TRANSMISSION_DELAY_MAX	65535	/* ns */
 
 #define ID_VENDOR_APPLE 0x05ac
+#define ID_VENDOR_USB_HUB 0x0424
+#define ID_VENDOR_LTE 0x1199
 #define ID_PRODUCT_IPAD_MIN 0x1280
 #define ID_PRODUCT_IPAD_MAX 0x1300
 
 extern int set_usb_to_host(void);
+extern int set_usb_to_device(void);
 
 /* Protect struct usb_device->state and ->children members
  * Note: Both are also protected by ->dev.sem, except that ->state can
@@ -5122,7 +5125,9 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 		if (status)
 			dev_dbg(hub->intfdev, "%dmA power budget left\n", status);
         
-        if (udev->descriptor.idVendor != ID_VENDOR_APPLE)
+        if ((udev->descriptor.idVendor == ID_VENDOR_LTE))
+            set_usb_to_device();
+        else if ((udev->descriptor.idVendor != ID_VENDOR_APPLE) && (udev->descriptor.idVendor != ID_VENDOR_USB_HUB))
             set_usb_to_host();
 
 		return;
