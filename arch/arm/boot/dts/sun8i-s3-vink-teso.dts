@@ -91,7 +91,13 @@
 		};
 	};
 
-
+    user_io@0 {
+        compatible = "mydevice,generic-uio,ui_pdrv";
+        status = "okay";
+        interrupt-parent = <&pio>;
+        interrupts = <1 13 IRQ_TYPE_EDGE_FALLING>; /* PB13 */
+    };
+	
     custom_gpio_export {
         compatible = "gpio-leds";
 
