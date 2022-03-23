@@ -48,6 +48,8 @@
 #define ID_PRODUCT_IPAD_MIN 0x1280
 #define ID_PRODUCT_IPAD_MAX 0x1300
 
+int uvc_enabled_flag = 0;
+
 extern int set_usb_to_host(void);
 extern int set_usb_to_device(void);
 
@@ -1906,6 +1908,16 @@ hub_ioctl(struct usb_interface *intf, unsigned int code, void *user_data)
 
 		return info->nports + 1;
 		}
+    case USBDEVFS_UVC_UAC_SET: {
+        unsigned int *uvc_state = user_data;
+        uvc_enabled_flag = *uvc_state;
+
+        /* Set usb to host immediately if UVC is enabled */
+        if (uvc_enabled_flag)
+            set_usb_to_host();
+
+        return uvc_enabled_flag;
+        }
 
 	default:
 		return -ENOSYS;
@@ -5127,7 +5139,7 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
         
         if ((udev->descriptor.idVendor == ID_VENDOR_LTE))
             set_usb_to_device();
-        else if ((udev->descriptor.idVendor != ID_VENDOR_APPLE) && (udev->descriptor.idVendor != ID_VENDOR_USB_HUB))
+        else if (((udev->descriptor.idVendor != ID_VENDOR_APPLE) && (udev->descriptor.idVendor != ID_VENDOR_USB_HUB)) || (uvc_enabled_flag == 1))
             set_usb_to_host();
 
 		return;
