@@ -91,14 +91,20 @@
 		};
 	};
 
-
+    user_io@0 {
+        compatible = "mydevice,generic-uio,ui_pdrv";
+        status = "okay";
+        interrupt-parent = <&pio>;
+        interrupts = <1 13 IRQ_TYPE_EDGE_FALLING>; /* PB13 */
+    };
+	
     custom_gpio_export {
         compatible = "gpio-leds";
 
         lte_pwr {
 			label = "lte_pwr";
 			gpios = <&pio 4 18 GPIO_ACTIVE_HIGH>; /* PE18 */
-			default-state = "on";
+			default-state = "off";
 		};
 
         lte_3_3v {
