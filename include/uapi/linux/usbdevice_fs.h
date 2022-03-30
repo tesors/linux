@@ -227,5 +227,6 @@ struct usbdevfs_streams {
 #define USBDEVFS_FORBID_SUSPEND    _IO('U', 33)
 #define USBDEVFS_ALLOW_SUSPEND     _IO('U', 34)
 #define USBDEVFS_WAIT_FOR_RESUME   _IO('U', 35)
+#define USBDEVFS_UVC_UAC_SET       _IOWR('U', 36, unsigned int)
 
 #endif /* _UAPI_LINUX_USBDEVICE_FS_H */

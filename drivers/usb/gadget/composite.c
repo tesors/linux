@@ -346,14 +346,14 @@ int usb_function_deactivate(struct usb_function *function)
 	unsigned long			flags;
 	int				status = 0;
 
-	spin_lock_irqsave(&cdev->lock, flags);
+	spin_lock_irqsave(&cdev->deactivations_lock, flags);
 
 	if (cdev->deactivations == 0)
 		status = usb_gadget_deactivate(cdev->gadget);
 	if (status == 0)
 		cdev->deactivations++;
 
-	spin_unlock_irqrestore(&cdev->lock, flags);
+	spin_unlock_irqrestore(&cdev->deactivations_lock, flags);
 	return status;
 }
 EXPORT_SYMBOL_GPL(usb_function_deactivate);
@@ -374,7 +374,7 @@ int usb_function_activate(struct usb_function *function)
 	unsigned long			flags;
 	int				status = 0;
 
-	spin_lock_irqsave(&cdev->lock, flags);
+	spin_lock_irqsave(&cdev->deactivations_lock, flags);
 
 	if (WARN_ON(cdev->deactivations == 0))
 		status = -EINVAL;
@@ -384,7 +384,7 @@ int usb_function_activate(struct usb_function *function)
 			status = usb_gadget_activate(cdev->gadget);
 	}
 
-	spin_unlock_irqrestore(&cdev->lock, flags);
+	spin_unlock_irqrestore(&cdev->deactivations_lock, flags);
 	return status;
 }
 EXPORT_SYMBOL_GPL(usb_function_activate);
@@ -2214,6 +2214,7 @@ static int composite_bind(struct usb_gadget *gadget,
 		return status;
 
 	spin_lock_init(&cdev->lock);
+    	spin_lock_init(&cdev->deactivations_lock);
 	cdev->gadget = gadget;
 	set_gadget_data(gadget, cdev);
 	INIT_LIST_HEAD(&cdev->configs);
