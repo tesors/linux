@@ -49,6 +49,7 @@
 #define ID_PRODUCT_IPAD_MAX 0x1300
 
 int uvc_enabled_flag = 0;
+int lte_enabled_flag = 0;
 
 extern int set_usb_to_host(void);
 extern int set_usb_to_device(void);
@@ -1917,6 +1918,16 @@ hub_ioctl(struct usb_interface *intf, unsigned int code, void *user_data)
             set_usb_to_host();
 
         return uvc_enabled_flag;
+        }
+    case USBDEVFS_LTE_STATE_SET: {
+        unsigned int *lte_state = user_data;
+        lte_enabled_flag = *lte_state;
+
+        /* Set usb to host immediately if UVC is enabled */
+        if (lte_enabled_flag)
+            set_usb_to_device();
+
+        return lte_enabled_flag;
         }
 
 	default:

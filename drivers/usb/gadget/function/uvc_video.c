@@ -19,6 +19,9 @@
 #include "uvc_queue.h"
 #include "uvc_video.h"
 
+static int firstVideoPacket = 0;
+static int pts_for_header = 0;
+
 /* --------------------------------------------------------------------------
  * Video codecs
  */
@@ -27,8 +30,8 @@ static int
 uvc_video_encode_header(struct uvc_video *video, struct uvc_buffer *buf,
 		u8 *data, int len)
 {
-	data[0] = 2;
-	data[1] = UVC_STREAM_EOH | video->fid;
+	data[0] = 6;
+	data[1] = UVC_STREAM_EOH | video->fid | UVC_STREAM_PTS;
 
 	if (buf->bytesused - video->queue.buf_used <= len - 2)
 		data[1] |= UVC_STREAM_EOF;
@@ -100,6 +103,7 @@ uvc_video_encode_isoc(struct usb_request *req, struct uvc_video *video,
 {
 	void *mem = req->buf;
 	int len = video->req_size;
+    struct uvc_video_queue *queue = &video->queue;
 	int ret;
 
 	/* Add the header. */
@@ -107,6 +111,16 @@ uvc_video_encode_isoc(struct usb_request *req, struct uvc_video *video,
 	mem += ret;
 	len -= ret;
 
+    if (firstVideoPacket){
+        /* PTS is added to the beginning of video frame in userspace. */
+        memcpy(&pts_for_header, buf->mem + queue->buf_used, sizeof(int));
+        firstVideoPacket = 0;
+    } else{
+        /* Copy saved PTS to the end of header for rest of video buffers of one video frame. */
+        memcpy(mem, &pts_for_header, sizeof(int));
+        mem += 4;
+        len -= 4;
+    }
 	/* Process video data. */
 	ret = uvc_video_encode_data(video, buf, mem, len);
 	len -= ret;
@@ -118,6 +132,7 @@ uvc_video_encode_isoc(struct usb_request *req, struct uvc_video *video,
 		buf->state = UVC_BUF_STATE_DONE;
 		uvcg_queue_next_buffer(&video->queue, buf);
 		video->fid ^= UVC_STREAM_FID;
+        firstVideoPacket = 1;
 	}
 }
 
