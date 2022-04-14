@@ -5147,12 +5147,21 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 		status = hub_power_remaining(hub);
 		if (status)
 			dev_dbg(hub->intfdev, "%dmA power budget left\n", status);
-        
-        if ((udev->descriptor.idVendor == ID_VENDOR_LTE))
-            set_usb_to_device();
-        else if (((udev->descriptor.idVendor != ID_VENDOR_APPLE) && (udev->descriptor.idVendor != ID_VENDOR_USB_HUB)) || (uvc_enabled_flag == 1))
-            set_usb_to_host();
 
+        if (uvc_enabled_flag == 1)
+            set_usb_to_host();
+        else {
+            if ((udev->descriptor.idVendor == ID_VENDOR_LTE))
+                set_usb_to_device();
+            else if (udev->descriptor.idVendor == ID_VENDOR_APPLE) {
+                if (udev->descriptor.idProduct > ID_PRODUCT_IPAD_MIN && udev->descriptor.idProduct < ID_PRODUCT_IPAD_MAX)
+                    set_usb_to_device(); // iPhone connected
+                else
+                    set_usb_to_host(); // iMac connected
+            } else { //android connected
+                set_usb_to_host();
+            }
+        }
 		return;
 
 loop_disable:
