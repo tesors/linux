@@ -119,13 +119,13 @@ void sun6i_mipi_setup_bus(struct sun6i_csi *csi)
 	struct sun6i_dphy_param dphy_param = { 0 };
 	int lane_num = lanes_number;
 	bool input_interlaced = false;
-    printk("sun6i_mipi_setup_bus %d \n", lane_num);
+    printk("sun6i_mipi_setup_bus %d field %d\n", lane_num, csi->config.field );
 	if (csi->config.field == V4L2_FIELD_INTERLACED ||
 	    csi->config.field == V4L2_FIELD_INTERLACED_TB ||
 	    csi->config.field == V4L2_FIELD_INTERLACED_BT)
 		input_interlaced = true;
-
-	regmap_write_bits(sdev->regmap, MIPI_CSI2_CFG_REG, MIPI_CSI2_CFG_DL_CFG,
+ printk("interlaced %d \n", input_interlaced);
+    regmap_write_bits(sdev->regmap, MIPI_CSI2_CFG_REG, MIPI_CSI2_CFG_DL_CFG,
 			  (lane_num - 1) << MIPI_CSI2_CFG_DL_CFG_SHIFT);
 	regmap_write_bits(sdev->regmap, MIPI_CSI2_CFG_REG, MIPI_CSI2_CFG_CH_MOD,
 			  0);
