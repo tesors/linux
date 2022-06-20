@@ -40,7 +40,12 @@
 /* RGB ouput selection */
 //#define TC358743_VOUT_RGB
 
+#define TC358743_WAIT_FOR_FORMAT_CHANGE _IOWR('V', BASE_VIDIOC_PRIVATE, unsigned int)
+
 static DECLARE_WAIT_QUEUE_HEAD(wq);
+
+static int tc358743_s_dv_timings(struct v4l2_subdev *sd,
+				                 struct v4l2_dv_timings *timings);
 
 static int debug = 3;
 module_param(debug, int, 0644);
@@ -154,10 +159,9 @@ static u8 edid[] = {
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xFC,
     0x00,0x54,0x6F,0x73,0x68,0x69,0x62,0x61,
     0x2D,0x48,0x32,0x43,0x0A,0x20,0x01,0x72,
-    0x02,0x03,0x1E,0x00,0x4B,0x9F,0x22,0x21,
+    0x02,0x03,0x16,0x00,0x4B,0x9F,0x22,0x21,
     0x20,0x04,0x3C,0x3D,0x3E,0x4B,0x05,0x13,
-    0x23,0x09,0x04,0x01,0x65,0x03,0x0C,0x00,
-    0x10,0x00,0x83,0x01,0x00,0x00,0x00,0x00,
+    0x20,0x60,0x83,0x01,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -169,7 +173,8 @@ static u8 edid[] = {
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x39,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x76,
 #endif
 };
 /* Max transfer size done by I2C transfer functions */
@@ -430,6 +435,35 @@ static unsigned tc358743_num_csi_lanes_in_use(struct v4l2_subdev *sd)
 }
 
 /* --------------- TIMINGS --------------- */
+
+bool tc35874_valid_dv_timings(const struct v4l2_dv_timings *t,
+			   const struct v4l2_dv_timings_cap *dvcap,
+			   v4l2_check_dv_timings_fnc fnc,
+			   void *fnc_handle)
+{
+	const struct v4l2_bt_timings *bt = &t->bt;
+	const struct v4l2_bt_timings_cap *cap = &dvcap->bt;
+	u32 caps = cap->capabilities;
+
+	if (t->type != V4L2_DV_BT_656_1120)
+		return false;
+	if (t->type != dvcap->type ||
+	    bt->height < cap->min_height ||
+	    bt->height > cap->max_height ||
+	    bt->width < cap->min_width ||
+	    bt->width > cap->max_width ||
+	    bt->vsync > cap->max_width ||
+	    bt->vsync < cap->min_width ||
+	    bt->pixelclock < cap->min_pixelclock ||
+	    bt->pixelclock > cap->max_pixelclock ||
+	    (!(caps & V4L2_DV_BT_CAP_CUSTOM) &&
+	     cap->standards && bt->standards &&
+	     !(bt->standards & cap->standards)) ||
+	    (bt->interlaced && !(caps & V4L2_DV_BT_CAP_INTERLACED)) ||
+	    (!bt->interlaced && !(caps & V4L2_DV_BT_CAP_PROGRESSIVE)))
+		return false;
+	return fnc == NULL || fnc(t, fnc_handle);
+}
 
 static inline unsigned fps(const struct v4l2_bt_timings *t)
 {
@@ -1113,24 +1147,28 @@ static void tc358743_format_change(struct v4l2_subdev *sd)
 	if (tc358743_get_detected_timings(sd, &timings)) {
 		enable_stream(sd, false);
         memset(&state->timings, 0, sizeof(state->timings));
+
+        /* set fifo_critical counter to one */
+        atomic_set(&fifo_critical, 1);
+        wake_up_interruptible(&wq);
+
 		v4l2_info(sd, "%s: Format changed. No signal\n", __func__);
 	} else {
 		if (!v4l2_match_dv_timings(&state->timings, &timings, 0, false))
 			enable_stream(sd, false);
-		state->timings = timings;
 
-		v4l2_print_dv_timings(sd->name,
+        /* automaticly set timing rather than set by userspace */
+        if (tc358743_s_dv_timings(sd, &timings) == 0) {
+            /* set fifo_critical counter to one */
+            atomic_set(&fifo_critical, 1);
+            wake_up_interruptible(&wq);
+            v4l2_print_dv_timings(sd->name,
 				"tc358743_format_change: Format change`d. New format: ",	&timings, false);
+        }
 	}
-
-	/* set fifo_critical counter to one */
-    atomic_set(&fifo_critical, 1);
-    wake_up_interruptible(&wq);
 
 	if (sd->devnode)
 		v4l2_subdev_notify_event(sd, &tc358743_ev_fmt);
-    /* Change the number of lanes used if needed */
-    tc358743_set_csi(sd);
 }
 
 static void tc358743_init_interrupts(struct v4l2_subdev *sd)
@@ -1530,7 +1568,7 @@ static int tc358743_s_dv_timings(struct v4l2_subdev *sd,
 		return 0;
 	}
 
-	if (!v4l2_valid_dv_timings(timings,	&tc358743_timings_cap, NULL, NULL)) {
+	if (!tc35874_valid_dv_timings(timings,	&tc358743_timings_cap, NULL, NULL)) {
 		v4l2_err(sd, "%s: timings out of range\n", __func__);
 		return -ERANGE;
 	}
@@ -1583,7 +1621,7 @@ static int tc358743_query_dv_timings(struct v4l2_subdev *sd,
 		v4l2_print_dv_timings(sd->name, "tc358743_query_dv_timings: ",
 				timings, false);
 
-	if (!v4l2_valid_dv_timings(timings,
+	if (!tc35874_valid_dv_timings(timings,
 				&tc358743_timings_cap, NULL, NULL)) {
 		v4l2_err(sd, "%s: @@@@@ timings out of range\n", __func__);
 		return -ERANGE;
@@ -1661,10 +1699,15 @@ static int tc358743_s_stream(struct v4l2_subdev *sd, int enable)
 	if (enable)
 		tc358743_log_status(sd);
 	*/
-	enable_stream(sd, true);
+	//enable_stream(sd, true);
 	// if (true)
 	// 	tc358743_log_status(sd);
-	
+
+	enable_stream(sd, enable);
+	if (!enable) {
+		/* Put all lanes in LP-11 state (STOPSTATE) */
+		tc358743_set_csi(sd);
+	}
 	return 0;
 }
 
@@ -1986,7 +2029,6 @@ static int tc358743_s_power(struct v4l2_subdev *sd, int on)
 {
 	return 0;
 }
-#define TC358743_WAIT_FOR_FORMAT_CHANGE _IOWR('V', BASE_VIDIOC_PRIVATE, unsigned int)
 
 static long tc358743_ioctl(struct v4l2_subdev *sd,
 			unsigned int cmd, void *arg)
