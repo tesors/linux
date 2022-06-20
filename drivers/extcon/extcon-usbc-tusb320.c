@@ -144,38 +144,34 @@ static irqreturn_t tusb320_irq_handler(int irq, void *dev_id)
 		tusb_attached_states[state], polarity);
 
     if (uvc_enabled_flag) {
+        state = TUSB320_ATTACHED_STATE_UFP;
+    }
+
+    if (lte_enabled_flag) {
+        state = TUSB320_ATTACHED_STATE_DFP;
+    }
+
+    if (state == TUSB320_ATTACHED_STATE_DFP || state == TUSB320_ATTACHED_STATE_ACC) {
+        gpiod_set_value(priv->otg_vbus_gpiod, 0);
+        modeeee = file_open(USB_MODE_PATH, open_flags, 0600);
+        if (modeeee != NULL) {
+            file_write(modeeee, 0, "host", 12);
+            file_close(modeeee);
+        }
+    } else if (state == TUSB320_ATTACHED_STATE_UFP){
         gpiod_set_value(priv->otg_vbus_gpiod, 1);
         modeeee = file_open(USB_MODE_PATH, open_flags, 0600);
         if (modeeee != NULL) {
             file_write(modeeee, 0, "peripheral", 12);
             file_close(modeeee);
         }
-    } else if (lte_enabled_flag) {
+    } else {
         tusb320_port_mode_set(TUSB320_REG_SET_BY_PORT);
         gpiod_set_value(priv->otg_vbus_gpiod, 1);
         modeeee = file_open(USB_MODE_PATH, open_flags, 0600);
         if (modeeee != NULL) {
             file_write(modeeee, 0, "host", 12);
             file_close(modeeee);
-        }
-    }else {
-        if (state == TUSB320_ATTACHED_STATE_DFP || state == TUSB320_ATTACHED_STATE_ACC) {
-            gpiod_set_value(priv->otg_vbus_gpiod, 0);
-        } else if (state == TUSB320_ATTACHED_STATE_UFP){
-            gpiod_set_value(priv->otg_vbus_gpiod, 1);
-            modeeee = file_open(USB_MODE_PATH, open_flags, 0600);
-            if (modeeee != NULL) {
-                file_write(modeeee, 0, "peripheral", 12);
-                file_close(modeeee);
-            }
-        } else {
-            tusb320_port_mode_set(TUSB320_REG_SET_BY_PORT);
-            gpiod_set_value(priv->otg_vbus_gpiod, 1);
-            modeeee = file_open(USB_MODE_PATH, open_flags, 0600);
-            if (modeeee != NULL) {
-                file_write(modeeee, 0, "host", 12);
-                file_close(modeeee);
-            }
         }
     }
 

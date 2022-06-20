@@ -53,6 +53,10 @@
 
 #define FIFOCTL                               0x0006
 
+#define PACKETID1                             0x000C
+
+#define FCCTL                                 0x0012
+
 #define INTSTATUS                             0x0014
 #define MASK_AMUTE_INT                        0x0400
 #define MASK_HDMI_INT                         0x0200

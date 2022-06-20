@@ -12,5 +12,5 @@
 
 void sun6i_mipi_set_stream(struct sun6i_csi *csi, bool enable);
 void sun6i_mipi_setup_bus(struct sun6i_csi *csi);
-
+void sun6i_mipi_setup_lane_num(int lane_number);
 #endif /* __SUN6I_MIPI_H__ */

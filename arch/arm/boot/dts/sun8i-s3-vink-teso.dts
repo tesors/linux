@@ -398,8 +398,7 @@
     tc358743: tc358743@f {
         compatible = "toshiba,tc358743";
 		reg = <0x0f>;
-		rst-gpios = <&pio 1 11 GPIO_ACTIVE_LOW>;
-		interrupts-extended = <&pio 5 6 IRQ_TYPE_LEVEL_LOW>;
+		interrupts-extended = <&pio 1 11 IRQ_TYPE_LEVEL_LOW>;
 		clocks = <&tc358743_clk>;
 		clock-names = "refclk";
 		

@@ -48,6 +48,12 @@ enum pkt_fmt {
 	MIPI_USR_DAT6 = 0X36,
 	MIPI_USR_DAT7 = 0X37,
 };
+static int lanes_number = 4;
+
+void sun6i_mipi_setup_lane_num(int lane_number) {
+    if (lane_number <= 4)
+        lanes_number = lane_number;
+}
 
 static inline struct sun6i_csi_dev *sun6i_csi_to_dev(struct sun6i_csi *csi)
 {
@@ -111,15 +117,15 @@ void sun6i_mipi_setup_bus(struct sun6i_csi *csi)
 	struct v4l2_fwnode_endpoint *endpoint = &csi->v4l2_ep;
 	struct sun6i_csi_dev *sdev = sun6i_csi_to_dev(csi);
 	struct sun6i_dphy_param dphy_param = { 0 };
-	int lane_num = endpoint->bus.mipi_csi2.num_data_lanes;
+	int lane_num = lanes_number;
 	bool input_interlaced = false;
-
+    printk("sun6i_mipi_setup_bus %d field %d\n", lane_num, csi->config.field );
 	if (csi->config.field == V4L2_FIELD_INTERLACED ||
 	    csi->config.field == V4L2_FIELD_INTERLACED_TB ||
 	    csi->config.field == V4L2_FIELD_INTERLACED_BT)
 		input_interlaced = true;
-
-	regmap_write_bits(sdev->regmap, MIPI_CSI2_CFG_REG, MIPI_CSI2_CFG_DL_CFG,
+ printk("interlaced %d \n", input_interlaced);
+    regmap_write_bits(sdev->regmap, MIPI_CSI2_CFG_REG, MIPI_CSI2_CFG_DL_CFG,
 			  (lane_num - 1) << MIPI_CSI2_CFG_DL_CFG_SHIFT);
 	regmap_write_bits(sdev->regmap, MIPI_CSI2_CFG_REG, MIPI_CSI2_CFG_CH_MOD,
 			  0);

@@ -26,6 +26,7 @@
 #include <linux/workqueue.h>
 #include <linux/v4l2-dv-timings.h>
 #include <linux/hdmi.h>
+#include <linux/wait.h>
 #include <media/cec.h>
 #include <media/v4l2-dv-timings.h>
 #include <media/v4l2-device.h>
@@ -35,9 +36,16 @@
 #include <media/i2c/tc358743.h>
 
 #include "tc358743_regs.h"
-
+#include "../../staging/media/sunxi/sun6i-csi/sun6i_mipi.h"
 /* RGB ouput selection */
 //#define TC358743_VOUT_RGB
+
+#define TC358743_WAIT_FOR_FORMAT_CHANGE _IOWR('V', BASE_VIDIOC_PRIVATE, unsigned int)
+
+static DECLARE_WAIT_QUEUE_HEAD(wq);
+
+static int tc358743_s_dv_timings(struct v4l2_subdev *sd,
+				                 struct v4l2_dv_timings *timings);
 
 static int debug = 3;
 module_param(debug, int, 0644);
@@ -75,6 +83,8 @@ struct camera_common_frmfmt {
 	bool	hdr_en;
 	int	mode;
 };
+
+atomic_t fifo_critical;
 
 /* frame format */
 static const struct camera_common_frmfmt tc358743_frmfmt[] = {
@@ -133,38 +143,38 @@ static u8 edid[] = {
 	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xd7
 #else
-	0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,
-	0x52,0x62,0x88,0x88,0x00,0x88,0x88,0x88,
-	0x1C,0x15,0x01,0x03,0x80,0x00,0x00,0x78,
-	0x0A,0x0D,0xC9,0xA0,0x57,0x47,0x98,0x27,
-	0x12,0x48,0x4C,0x00,0x00,0x00,0x01,0x01,
-	0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,
-	0x01,0x01,0x01,0x01,0x01,0x01,0x02,0x3A,
-	0x80,0xD0,0x72,0x38,0x2D,0x40,0x10,0x2C,
-	0x45,0x80,0x66,0x4C,0x00,0x00,0x00,0x1E,
-	0x01,0x1D,0x00,0xBC,0x52,0xD0,0x1E,0x20,
-	0xB8,0x28,0x55,0x40,0x66,0x4C,0x00,0x00,
-	0x00,0x1E,0x00,0x00,0x00,0xFC,0x00,0x54,
-	0x6F,0x73,0x68,0x69,0x62,0x61,0x2D,0x48,
-	0x32,0x43,0x0A,0x20,0x00,0x00,0x00,0xFD,
-	0x00,0x14,0x78,0x01,0xFF,0x10,0x00,0x0A,
-	0x20,0x20,0x20,0x20,0x20,0x20,0x00,0xBA,
-	0x02,0x03,0x1A,0x71,0x47,0x9F,0x13,0x22,
-	0x1F,0x02,0x11,0x1F,0x23,0x09,0x07,0x01,
-	0x83,0x01,0x00,0x00,0x65,0x03,0x0C,0x00,
-	0x10,0x00,0x01,0x1D,0x80,0x18,0x71,0x38,
-	0x2D,0x40,0x58,0x2C,0x45,0x00,0x66,0x4C,
-	0x00,0x00,0x00,0x1E,0x02,0x3A,0x80,0xD0,
-	0x72,0x38,0x2D,0x40,0x10,0x2C,0x45,0x80,
-	0x66,0x4C,0x00,0x00,0x00,0x1E,0x8C,0x0A,
-	0xD0,0x8A,0x20,0xE0,0x2D,0x10,0x10,0x3E,
-	0x96,0x00,0x66,0x4C,0x00,0x00,0x00,0x18,
-	0x8C,0x0A,0xD0,0x90,0x20,0x40,0x31,0x20,
-	0x0C,0x40,0x55,0x00,0x66,0x4C,0x00,0x00,
-	0x00,0x18,0x00,0x00,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-	0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02,
+    0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,
+    0x52,0x62,0x88,0x88,0x00,0x88,0x88,0x88,
+    0x1C,0x15,0x01,0x03,0x80,0x00,0x00,0x78,
+    0x0A,0x0D,0xC9,0xA0,0x57,0x47,0x98,0x27,
+    0x12,0x48,0x4C,0x00,0x00,0x00,0x01,0x00,
+    0x01,0x00,0x01,0x00,0x01,0x00,0x01,0x00,
+    0x01,0x00,0x01,0x01,0x01,0x01,0x02,0x3A,
+    0x80,0x18,0x71,0x38,0x2D,0x40,0x58,0x2C,
+    0x45,0x00,0x66,0x4C,0x00,0x00,0x00,0x1E,
+    0x00,0x00,0x00,0x10,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x10,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xFC,
+    0x00,0x54,0x6F,0x73,0x68,0x69,0x62,0x61,
+    0x2D,0x48,0x32,0x43,0x0A,0x20,0x01,0x72,
+    0x02,0x03,0x16,0x00,0x4B,0x9F,0x22,0x21,
+    0x20,0x04,0x3C,0x3D,0x3E,0x4B,0x05,0x13,
+    0x20,0x60,0x83,0x01,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x76,
 #endif
 };
 /* Max transfer size done by I2C transfer functions */
@@ -178,7 +188,7 @@ static const struct v4l2_dv_timings_cap tc358743_timings_cap = {
 	V4L2_INIT_BT_TIMINGS(1, 10000, 1, 10000, 0, 165000000,
 			V4L2_DV_BT_STD_CEA861 | V4L2_DV_BT_STD_DMT |
 			V4L2_DV_BT_STD_GTF | V4L2_DV_BT_STD_CVT,
-			V4L2_DV_BT_CAP_PROGRESSIVE |
+			V4L2_DV_BT_CAP_PROGRESSIVE | V4L2_DV_BT_CAP_INTERLACED |
 			V4L2_DV_BT_CAP_REDUCED_BLANKING |
 			V4L2_DV_BT_CAP_CUSTOM)
 };
@@ -426,6 +436,35 @@ static unsigned tc358743_num_csi_lanes_in_use(struct v4l2_subdev *sd)
 
 /* --------------- TIMINGS --------------- */
 
+bool tc35874_valid_dv_timings(const struct v4l2_dv_timings *t,
+			   const struct v4l2_dv_timings_cap *dvcap,
+			   v4l2_check_dv_timings_fnc fnc,
+			   void *fnc_handle)
+{
+	const struct v4l2_bt_timings *bt = &t->bt;
+	const struct v4l2_bt_timings_cap *cap = &dvcap->bt;
+	u32 caps = cap->capabilities;
+
+	if (t->type != V4L2_DV_BT_656_1120)
+		return false;
+	if (t->type != dvcap->type ||
+	    bt->height < cap->min_height ||
+	    bt->height > cap->max_height ||
+	    bt->width < cap->min_width ||
+	    bt->width > cap->max_width ||
+	    bt->vsync > cap->max_width ||
+	    bt->vsync < cap->min_width ||
+	    bt->pixelclock < cap->min_pixelclock ||
+	    bt->pixelclock > cap->max_pixelclock ||
+	    (!(caps & V4L2_DV_BT_CAP_CUSTOM) &&
+	     cap->standards && bt->standards &&
+	     !(bt->standards & cap->standards)) ||
+	    (bt->interlaced && !(caps & V4L2_DV_BT_CAP_INTERLACED)) ||
+	    (!bt->interlaced && !(caps & V4L2_DV_BT_CAP_PROGRESSIVE)))
+		return false;
+	return fnc == NULL || fnc(t, fnc_handle);
+}
+
 static inline unsigned fps(const struct v4l2_bt_timings *t)
 {
 	if (!V4L2_DV_BT_FRAME_HEIGHT(t) || !V4L2_DV_BT_FRAME_WIDTH(t))
@@ -479,12 +518,20 @@ static int tc358743_get_detected_timings(struct v4l2_subdev *sd,
 	if (bt->interlaced == V4L2_DV_INTERLACED) {
 		bt->height *= 2;
 		bt->il_vsync = bt->vsync + 1;
-		bt->pixelclock /= 2;
+	//	bt->pixelclock /= 2;
+
+		/* frame count number: FS = FE 1,2,1,2... */
+		i2c_wr16(sd, FCCTL, 0x0002);
+		/* packet id for interlace mode only */
+		i2c_wr16(sd, PACKETID1, 0x1e1e);
+	} else {
+		i2c_wr16(sd, FCCTL, 0);
 	}
-	v4l2_info(sd,"%d:%s: width %d heigh %d interlaced %d\n",__LINE__,__FUNCTION__,		
+	v4l2_info(sd,"%d:%s: width %d heigh %d interlaced %d %lld\n",__LINE__,__FUNCTION__,
 	        bt->width,		
 	        bt->height,		
-	        bt->interlaced);
+	        bt->interlaced,
+            bt->pixelclock);
 	return 0;
 }
 /* --------------- HOTPLUG / HDCP / EDID --------------- */
@@ -620,12 +667,27 @@ static unsigned tc358743_num_csi_lanes_needed(struct v4l2_subdev *sd)
 	struct tc358743_state *state = to_state(sd);
 	struct v4l2_bt_timings *bt = &state->timings.bt;
 	struct tc358743_platform_data *pdata = &state->pdata;
+    unsigned int lanes;
+
 	u32 bits_pr_pixel =
 		(state->mbus_fmt_code == MEDIA_BUS_FMT_UYVY8_1X16) ?  16 : 24;
-	u32 bps = bt->width * bt->height * fps(bt) * bits_pr_pixel;
+	//u32 bps = bt->width * bt->height * fps(bt) * bits_pr_pixel;
+	//u32 bps_pr_lane = (pdata->refclk_hz / pdata->pll_prd) * pdata->pll_fbd;
+	/* Hsync and vsync need to be included here. If omitted the
+	 * resulting lane number may be too low since this data has to
+	 * transmitted together with the active image data.
+	 *
+	 * The data types for bps and bps_pr_lane must be 64 bit wide.
+	 * With 32bit and high bps this will overflow.
+	 */
+	u32 bps = (bt->width + bt->hsync) * (bt->height + bt->vsync) * fps(bt) * bits_pr_pixel;
 	u32 bps_pr_lane = (pdata->refclk_hz / pdata->pll_prd) * pdata->pll_fbd;
+    printk("bt->width %d bt->hsync %d bt->height %d bt->vsync %d fps(bt) %d bits_pr_pixel %d bps_pr_lane %d\n", bt->width, bt->hsync, bt->height, bt->vsync, fps(bt), bits_pr_pixel, bps_pr_lane);
+    lanes = DIV_ROUND_UP(bps, bps_pr_lane);
+ 	if (lanes > 4)
+ 		lanes = 4;
 
-	return DIV_ROUND_UP(bps, bps_pr_lane);
+    return lanes;
 }
 // static int tc358743_get_edid(struct v4l2_subdev *sd){
 // 	//static int i2c_rd(struct v4l2_subdev *sd, u16 reg, u8 *values, u32 n)
@@ -955,6 +1017,11 @@ static void tc358743_set_csi(struct v4l2_subdev *sd)
 
 	i2c_wr32(sd, CSI_CONFW, MASK_MODE_SET |
 			MASK_ADDRESS_CSI_INT_ENA | MASK_INTER);
+
+    /*
+     * Set lanes number for sun6i mipi
+     */
+    sun6i_mipi_setup_lane_num(lanes);
 }
 
 static void tc358743_set_hdmi_phy(struct v4l2_subdev *sd)
@@ -1079,14 +1146,25 @@ static void tc358743_format_change(struct v4l2_subdev *sd)
 
 	if (tc358743_get_detected_timings(sd, &timings)) {
 		enable_stream(sd, false);
+        memset(&state->timings, 0, sizeof(state->timings));
+
+        /* set fifo_critical counter to one */
+        atomic_set(&fifo_critical, 1);
+        wake_up_interruptible(&wq);
 
 		v4l2_info(sd, "%s: Format changed. No signal\n", __func__);
 	} else {
 		if (!v4l2_match_dv_timings(&state->timings, &timings, 0, false))
 			enable_stream(sd, false);
 
-		v4l2_print_dv_timings(sd->name,
+        /* automaticly set timing rather than set by userspace */
+        if (tc358743_s_dv_timings(sd, &timings) == 0) {
+            /* set fifo_critical counter to one */
+            atomic_set(&fifo_critical, 1);
+            wake_up_interruptible(&wq);
+            v4l2_print_dv_timings(sd->name,
 				"tc358743_format_change: Format change`d. New format: ",	&timings, false);
+        }
 	}
 
 	if (sd->devnode)
@@ -1490,7 +1568,7 @@ static int tc358743_s_dv_timings(struct v4l2_subdev *sd,
 		return 0;
 	}
 
-	if (!v4l2_valid_dv_timings(timings,	&tc358743_timings_cap, NULL, NULL)) {
+	if (!tc35874_valid_dv_timings(timings,	&tc358743_timings_cap, NULL, NULL)) {
 		v4l2_err(sd, "%s: timings out of range\n", __func__);
 		return -ERANGE;
 	}
@@ -1543,7 +1621,7 @@ static int tc358743_query_dv_timings(struct v4l2_subdev *sd,
 		v4l2_print_dv_timings(sd->name, "tc358743_query_dv_timings: ",
 				timings, false);
 
-	if (!v4l2_valid_dv_timings(timings,
+	if (!tc35874_valid_dv_timings(timings,
 				&tc358743_timings_cap, NULL, NULL)) {
 		v4l2_err(sd, "%s: @@@@@ timings out of range\n", __func__);
 		return -ERANGE;
@@ -1621,10 +1699,15 @@ static int tc358743_s_stream(struct v4l2_subdev *sd, int enable)
 	if (enable)
 		tc358743_log_status(sd);
 	*/
-	enable_stream(sd, true);
+	//enable_stream(sd, true);
 	// if (true)
 	// 	tc358743_log_status(sd);
-	
+
+	enable_stream(sd, enable);
+	if (!enable) {
+		/* Put all lanes in LP-11 state (STOPSTATE) */
+		tc358743_set_csi(sd);
+	}
 	return 0;
 }
 
@@ -1646,7 +1729,7 @@ static int tc358743_get_fmt(struct v4l2_subdev *sd,
 	format->format.code = state->mbus_fmt_code;
 	format->format.width = state->timings.bt.width;
 	format->format.height = state->timings.bt.height;
-	format->format.field = V4L2_FIELD_NONE;
+	format->format.field = state->timings.bt.interlaced ? V4L2_FIELD_INTERLACED : V4L2_FIELD_NONE;
 
 
 	switch (vi_rep & MASK_VOUT_COLOR_SEL) {
@@ -1946,6 +2029,24 @@ static int tc358743_s_power(struct v4l2_subdev *sd, int on)
 {
 	return 0;
 }
+
+static long tc358743_ioctl(struct v4l2_subdev *sd,
+			unsigned int cmd, void *arg)
+{
+    switch (cmd) {
+    case TC358743_WAIT_FOR_FORMAT_CHANGE:
+        /* set fifo_critical counter to zero, in order to ignore all previous interrupts */
+        atomic_set(&fifo_critical, 0);
+        wait_event_interruptible(wq, atomic_read(&fifo_critical));
+        break;
+    default:
+        printk("Wrong TC358743 IOCTL cmd\n");
+        break;
+    }
+
+    return 0;
+}
+
 static const struct v4l2_subdev_core_ops tc358743_core_ops = {
 	.s_power = tc358743_s_power,
 	.log_status = tc358743_log_status,
@@ -1956,6 +2057,7 @@ static const struct v4l2_subdev_core_ops tc358743_core_ops = {
 	.interrupt_service_routine = tc358743_isr,
 	.subscribe_event = tc358743_subscribe_event,
 	.unsubscribe_event = v4l2_event_subdev_unsubscribe,
+    .ioctl = tc358743_ioctl,
 };
 
 static const struct v4l2_subdev_video_ops tc358743_video_ops = {
@@ -2031,14 +2133,6 @@ static int tc358743_probe_of(struct tc358743_state *state)
 	u32 bps_pr_lane;
 	int ret = -EINVAL;
 
-	// refclk = devm_clk_get(dev, "cam_mclk1");
-	// if (IS_ERR(refclk)) {
-	// 	if (PTR_ERR(refclk) != -EPROBE_DEFER)
-	// 		dev_err(dev, "failed to get refclk: %ld\n",
-	// 			PTR_ERR(refclk));
-	// 	return PTR_ERR(refclk);
-	// }
-
 	ep = of_graph_get_next_endpoint(dev->of_node, NULL);
 	if (!ep) {
 		dev_err(dev, "missing endpoint node\n");
@@ -2072,22 +2166,7 @@ static int tc358743_probe_of(struct tc358743_state *state)
     pr_info("tc358743 endpoint.nr_of_link_frequencies %d\n",
     	endpoint.nr_of_link_frequencies);
 
-	// state->bus = endpoint->bus.mipi_csi2;
-    // pr_info("tc358743 state->bus %s\n",state->bus);
-	// clk_prepare_enable(refclk);
-
-	// state->pdata.refclk_hz = clk_get_rate(refclk);
 	state->pdata.refclk_hz = 27000000;
-    // if ((state->pdata.refclk_hz != 26000000) ||
-    //     (state->pdata.refclk_hz != 27000000) ||
-    //     (state->pdata.refclk_hz != 42000000))
-    // {
-    //     pr_info("Set new clock\n");
-    //     if (0 != clk_set_rate(refclk,27000000))
-    //     {
-    //         pr_info("Error: Set new clock\n");
-    //     }
-    // }
 
 	state->pdata.ddc5v_delay = DDC5V_DELAY_100_MS;
 	state->pdata.hdmi_detection_delay = HDMI_MODE_DELAY_100_MS;
@@ -2150,7 +2229,7 @@ static int tc358743_probe_of(struct tc358743_state *state)
 	state->pdata.ths_trailcnt = 0x2;
 	state->pdata.hstxvregcnt = 2;
 /*richard you*/	
-	state->pdata.pll_prd        = 4;
+	//state->pdata.pll_prd        = 4;
 #ifdef TC358743_VOUT_RGB
 	state->pdata.pll_fbd        = 132;
 	
@@ -2165,7 +2244,7 @@ static int tc358743_probe_of(struct tc358743_state *state)
 	state->pdata.ths_trailcnt   =0x00000002;
 	state->pdata.hstxvregcnt    =0x00000005;
 #else
-	state->pdata.pll_fbd        = 88;
+	//	state->pdata.pll_fbd        = 88;
 
 	// timing setting
 	state->pdata.lineinitcnt    =0x00001770;
@@ -2179,14 +2258,6 @@ static int tc358743_probe_of(struct tc358743_state *state)
 	state->pdata.hstxvregcnt    =0x00000005;
 #endif
 	
-	//~ state->reset_gpio = devm_gpiod_get_optional(dev, "reset",
-						    //~ GPIOD_OUT_LOW);
-	//~ if (IS_ERR(state->reset_gpio)) {
-		//~ dev_err(dev, "failed to get reset gpio\n");
-		//~ ret = PTR_ERR(state->reset_gpio);
-		//~ goto disable_clk;
-	//~ }
-
 	if (state->reset_gpio) {
 		pr_info("Calling reset GPIO but NOT IMPLEMENTED!");
 		tc358743_gpio_reset(state);
@@ -2236,6 +2307,8 @@ static int tc358743_probe(struct i2c_client *client)
 	struct v4l2_subdev *sd;
 	int err;
 	u16 chip_id_val;
+
+    atomic_set(&fifo_critical, 0);
 
     // pr_info("%s %s %s\n",__FUNCTION__,__DATE__,__TIME__);
 
@@ -2353,6 +2426,7 @@ static int tc358743_probe(struct i2c_client *client)
 	v4l2_info(sd,"before tc358743_s_dv_timings\r\n");
 	//tc358743_log_status(sd);
 	tc358743_s_dv_timings(sd, &default_timing);
+    tc358743_format_change(sd);
 
 	v4l2_info(sd,"before tc358743_init_interrupts, irq: %d\r\n", state->i2c_client->irq);
 	//tc358743_log_status(sd);
