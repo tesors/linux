@@ -78,7 +78,7 @@ static struct snd_soc_dai_driver adau7002_dai = {
 		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S18_3LE |
 			SNDRV_PCM_FMTBIT_S20_3LE | SNDRV_PCM_FMTBIT_S24_LE |
 			SNDRV_PCM_FMTBIT_S24_3LE | SNDRV_PCM_FMTBIT_S32_LE,
-		.sig_bits = 20,
+		.sig_bits = 16,
 	},
 };
 

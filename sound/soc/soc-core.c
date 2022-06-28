@@ -1952,7 +1952,7 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 	for_each_card_prelinks(card, i, dai_link) {
 		ret = soc_init_dai_link(card, dai_link);
 		if (ret) {
-			dev_err(card->dev, "ASoC: failed to init link %s: %d\n",
+			printk("ASoC: failed to init link %s: %d\n",
 				dai_link->name, ret);
 			mutex_unlock(&client_mutex);
 			return ret;
@@ -1988,8 +1988,7 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 	ret = snd_card_new(card->dev, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1,
 			card->owner, 0, &card->snd_card);
 	if (ret < 0) {
-		dev_err(card->dev,
-			"ASoC: can't create sound card for card %s: %d\n",
+		printk("ASoC: can't create sound card for card %s: %d\n",
 			card->name, ret);
 		goto probe_end;
 	}
@@ -2018,8 +2017,7 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 	/* probe all components used by DAI links on this card */
 	ret = soc_probe_link_components(card);
 	if (ret < 0) {
-		dev_err(card->dev,
-			"ASoC: failed to instantiate card %d\n", ret);
+		printk("soc_probe_link_components ASoC: failed to instantiate card %d\n", ret);
 		goto probe_end;
 	}
 
@@ -2047,8 +2045,7 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 	/* probe all DAI links on this card */
 	ret = soc_probe_link_dais(card);
 	if (ret < 0) {
-		dev_err(card->dev,
-			"ASoC: failed to instantiate card %d\n", ret);
+		printk("soc_probe_link_dais ASoC: failed to instantiate card %d\n", ret);
 		goto probe_end;
 	}
 
@@ -2098,7 +2095,7 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 	if (card->late_probe) {
 		ret = card->late_probe(card);
 		if (ret < 0) {
-			dev_err(card->dev, "ASoC: %s late_probe() failed: %d\n",
+			printk("ASoC: %s late_probe() failed: %d\n",
 				card->name, ret);
 			goto probe_end;
 		}
@@ -2108,12 +2105,13 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 
 	ret = snd_card_register(card->snd_card);
 	if (ret < 0) {
-		dev_err(card->dev, "ASoC: failed to register soundcard %d\n",
+		printk("ASoC: failed to register soundcard %d\n",
 				ret);
 		goto probe_end;
 	}
 
 	card->instantiated = 1;
+    printk("card->instantiated = 1 \n");
 	dapm_mark_endpoints_dirty(card);
 	snd_soc_dapm_sync(&card->dapm);
 
@@ -2353,7 +2351,7 @@ static int snd_soc_bind_card(struct snd_soc_card *card)
 {
 	struct snd_soc_pcm_runtime *rtd;
 	int ret;
-
+    printk("snd_soc_bind_card \n");
 	ret = snd_soc_instantiate_card(card);
 	if (ret != 0)
 		return ret;
@@ -2413,6 +2411,7 @@ EXPORT_SYMBOL_GPL(snd_soc_register_card);
 
 static void snd_soc_unbind_card(struct snd_soc_card *card, bool unregister)
 {
+    printk("snd_soc_unbind_card \n");
 	if (card->instantiated) {
 		card->instantiated = false;
 		snd_soc_dapm_shutdown(card);
@@ -2439,6 +2438,7 @@ static void snd_soc_unbind_card(struct snd_soc_card *card, bool unregister)
 int snd_soc_unregister_card(struct snd_soc_card *card)
 {
 	mutex_lock(&client_mutex);
+    printk("snd_soc_unregister_card \n");
 	snd_soc_unbind_card(card, true);
 	mutex_unlock(&client_mutex);
 	dev_dbg(card->dev, "ASoC: Unregistered card '%s'\n", card->name);
@@ -2593,7 +2593,7 @@ static int snd_soc_register_dais(struct snd_soc_component *component,
 	unsigned int i;
 	int ret;
 
-	dev_dbg(dev, "ASoC: dai register %s #%zu\n", dev_name(dev), count);
+	printk( "ASoC: dai register %s #%zu\n", dev_name(dev), count);
 
 	for (i = 0; i < count; i++) {
 
@@ -2608,6 +2608,7 @@ static int snd_soc_register_dais(struct snd_soc_component *component,
 	return 0;
 
 err:
+    printk("snd_soc_register_dais err \n");
 	snd_soc_unregister_dais(component);
 
 	return ret;
@@ -2663,10 +2664,10 @@ static int snd_soc_component_initialize(struct snd_soc_component *component,
 	INIT_LIST_HEAD(&component->dobj_list);
 	INIT_LIST_HEAD(&component->card_list);
 	mutex_init(&component->io_mutex);
-
+    printk("snd_soc_component_initialize id comp %d \n", component->id);
 	component->name = fmt_single_name(dev, &component->id);
 	if (!component->name) {
-		dev_err(dev, "ASoC: Failed to allocate name\n");
+		printk("ASoC: Failed to allocate name\n");
 		return -ENOMEM;
 	}
 
@@ -2729,7 +2730,7 @@ EXPORT_SYMBOL_GPL(snd_soc_component_exit_regmap);
 static void snd_soc_component_add(struct snd_soc_component *component)
 {
 	mutex_lock(&client_mutex);
-
+    printk("snd_soc_component_add \n");
 	if (!component->driver->write && !component->driver->read) {
 		if (!component->regmap)
 			component->regmap = dev_get_regmap(component->dev,
@@ -2739,6 +2740,7 @@ static void snd_soc_component_add(struct snd_soc_component *component)
 	}
 
 	/* see for_each_component */
+    printk("snd_soc_component_add list_add\n");
 	list_add(&component->list, &component_list);
 
 	mutex_unlock(&client_mutex);
@@ -2798,10 +2800,14 @@ static void convert_endianness_formats(struct snd_soc_pcm_stream *stream)
 static void snd_soc_try_rebind_card(void)
 {
 	struct snd_soc_card *card, *c;
-
-	list_for_each_entry_safe(card, c, &unbind_card_list, list)
-		if (!snd_soc_bind_card(card))
+    printk("snd_soc_try_rebind_card \n");
+	list_for_each_entry_safe(card, c, &unbind_card_list, list){
+        printk("list_for_each_entry_safe unbind_card_list \n");
+		if (!snd_soc_bind_card(card)){
+            printk("snd_soc_try_rebind_card list_del \n");
 			list_del(&card->list);
+        }
+    }
 }
 
 int snd_soc_add_component(struct device *dev,
@@ -2812,10 +2818,12 @@ int snd_soc_add_component(struct device *dev,
 {
 	int ret;
 	int i;
-
+    printk("snd_soc_add_component \n");
 	ret = snd_soc_component_initialize(component, component_driver, dev);
-	if (ret)
+	if (ret) {
+        printk("snd_soc_component_initialize err_free \n");
 		goto err_free;
+    }
 
 	if (component_driver->endianness) {
 		for (i = 0; i < num_dai; i++) {
@@ -2826,7 +2834,7 @@ int snd_soc_add_component(struct device *dev,
 
 	ret = snd_soc_register_dais(component, dai_drv, num_dai);
 	if (ret < 0) {
-		dev_err(dev, "ASoC: Failed to register DAIs: %d\n", ret);
+		printk( "ASoC: Failed to register DAIs: %d\n", ret);
 		goto err_cleanup;
 	}
 
@@ -2852,7 +2860,10 @@ int snd_soc_register_component(struct device *dev,
 	component = devm_kzalloc(dev, sizeof(*component), GFP_KERNEL);
 	if (!component)
 		return -ENOMEM;
-
+    printk("snd_soc_register_component component driver name %s\n", component_driver->name);
+    if( dai_drv){
+        printk("snd_soc_register_component dai name %s\n",dai_drv->name);
+    }
 	return snd_soc_add_component(dev, component, component_driver,
 				     dai_drv, num_dai);
 }
