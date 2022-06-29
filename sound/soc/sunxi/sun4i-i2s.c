@@ -183,6 +183,8 @@ struct sun4i_i2s {
 	const struct sun4i_i2s_quirks	*variant;
 };
 
+static bool bit_clk_master;
+
 struct sun4i_i2s_clk_div {
 	u8	div;
 	u8	val;
@@ -235,7 +237,6 @@ static unsigned long sun4i_i2s_get_bclk_parent_rate(const struct sun4i_i2s *i2s)
 
 static unsigned long sun8i_i2s_get_bclk_parent_rate(const struct sun4i_i2s *i2s)
 {
-    printk("sun8i_i2s_get_bclk_parent_rate mod clk %ld \n", clk_get_rate(i2s->mod_clk));
 	return clk_get_rate(i2s->mod_clk);
 }
 
@@ -246,13 +247,11 @@ static int sun4i_i2s_get_bclk_div(struct sun4i_i2s *i2s,
 				  unsigned int word_size)
 {
 	const struct sun4i_i2s_clk_div *dividers = i2s->variant->bclk_dividers;
-
-	int div = (parent_rate+sampling_rate*word_size)/ sampling_rate / word_size / channels;
+	int div = parent_rate / sampling_rate / word_size / channels;
 	int i;
-  printk("sun4i_i2s_get_bclk_div parent_rate %ld  div %d \n", parent_rate, div);
 	for (i = 0; i < i2s->variant->num_bclk_dividers; i++) {
 		const struct sun4i_i2s_clk_div *bdiv = &dividers[i];
-        printk("bdiv->div %d \n ", bdiv->div);
+
 		if (bdiv->div == div)
 			return bdiv->val;
 	}
@@ -300,63 +299,67 @@ static int sun4i_i2s_set_clk_rate(struct snd_soc_dai *dai,
 	int bclk_div, mclk_div;
 	int ret;
 
-	switch (rate) {
-	case 176400:
-	case 88200:
-	case 44100:
-	case 22050:
-	case 11025:
-		clk_rate = 22579200;
-		break;
 
-	case 192000:
-	case 128000:
-	case 96000:
-	case 64000:
-	case 48000:
-	case 32000:
-	case 24000:
-	case 16000:
-	case 12000:
-	case 8000:
-		clk_rate = 24576000;
-		break;
+	if (bit_clk_master) {
+        switch (rate) {
+        case 176400:
+        case 88200:
+        case 44100:
+        case 22050:
+        case 11025:
+            clk_rate = 22579200;
+            break;
 
-	default:
-		dev_err(dai->dev, "Unsupported sample rate: %u\n", rate);
-		return -EINVAL;
-	}
+        case 192000:
+        case 128000:
+        case 96000:
+        case 64000:
+        case 48000:
+        case 32000:
+        case 24000:
+        case 16000:
+        case 12000:
+        case 8000:
+            clk_rate = 24576000;
+            break;
 
-// 	ret = clk_set_rate(i2s->mod_clk, clk_rate);
-// 	if (ret)
-// 		return ret;
-//     printk("i2s->mclk_freq %d / rate %d \n ", i2s->mclk_freq , rate);
-// 	oversample_rate = i2s->mclk_freq / rate;
-// 	if (!sun4i_i2s_oversample_is_valid(oversample_rate)) {
-// 		dev_err(dai->dev, "Unsupported oversample rate: %d\n",
-// 			oversample_rate);
-// 		return -EINVAL;
-// 	}
+        default:
+            dev_err(dai->dev, "Unsupported sample rate: %u\n", rate);
+            return -EINVAL;
+        }
 
-// 	bclk_parent_rate = i2s->variant->get_bclk_parent_rate(i2s);
-// 	bclk_div = sun4i_i2s_get_bclk_div(i2s, bclk_parent_rate,
-// 					  rate, slots, slot_width);
-// 	if (bclk_div < 0) {
-// 		dev_err(dai->dev, "Unsupported BCLK divider: %d\n", bclk_div);
-// 		return -EINVAL;
-// 	}
-//
-// 	mclk_div = sun4i_i2s_get_mclk_div(i2s, clk_rate, i2s->mclk_freq);
-// 	if (mclk_div < 0) {
-// 		dev_err(dai->dev, "Unsupported MCLK divider: %d\n", mclk_div);
-// 		return -EINVAL;
-// 	}
+        ret = clk_set_rate(i2s->mod_clk, clk_rate);
+        if (ret)
+            return ret;
 
-// 	regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
-// 		     SUN4I_I2S_CLK_DIV_BCLK(bclk_div) |
-// 		     SUN4I_I2S_CLK_DIV_MCLK(mclk_div));
+        oversample_rate = i2s->mclk_freq / rate;
+        if (!sun4i_i2s_oversample_is_valid(oversample_rate)) {
+            dev_err(dai->dev, "Unsupported oversample rate: %d\n",
+                oversample_rate);
+            return -EINVAL;
+        }
 
-	regmap_field_write(i2s->field_clkdiv_mclk_en, 0);
+        bclk_parent_rate = i2s->variant->get_bclk_parent_rate(i2s);
+        bclk_div = sun4i_i2s_get_bclk_div(i2s, bclk_parent_rate,
+                        rate, slots, slot_width);
+        if (bclk_div < 0) {
+            dev_err(dai->dev, "Unsupported BCLK divider: %d\n", bclk_div);
+            return -EINVAL;
+        }
+
+        mclk_div = sun4i_i2s_get_mclk_div(i2s, clk_rate, i2s->mclk_freq);
+        if (mclk_div < 0) {
+            dev_err(dai->dev, "Unsupported MCLK divider: %d\n", mclk_div);
+            return -EINVAL;
+        }
+
+        regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
+                SUN4I_I2S_CLK_DIV_BCLK(bclk_div) |
+                SUN4I_I2S_CLK_DIV_MCLK(mclk_div));
+
+        regmap_field_write(i2s->field_clkdiv_mclk_en, 1);
+    } else
+        regmap_field_write(i2s->field_clkdiv_mclk_en, 0);
 
 	return 0;
 }
@@ -423,7 +426,7 @@ static int sun8i_i2s_set_chan_cfg(const struct sun4i_i2s *i2s,
 
 	if (i2s->slots)
 		slots = i2s->slots;
-    printk("sun8i_i2s_set_chan_cfg \n");
+
 	/* Map the channels for playback and capture */
 	regmap_write(i2s->regmap, SUN8I_I2S_TX_CHAN_MAP_REG, 0x76543210);
 	regmap_write(i2s->regmap, SUN8I_I2S_RX_CHAN_MAP_REG, 0x76543210);
@@ -452,8 +455,7 @@ static int sun8i_i2s_set_chan_cfg(const struct sun4i_i2s *i2s,
 		break;
 
 	case SND_SOC_DAIFMT_I2S:
-		//lrck_period = params_physical_width(params);
-          lrck_period = 16;
+		lrck_period = params_physical_width(params);
 		break;
 
 	default:
@@ -463,9 +465,6 @@ static int sun8i_i2s_set_chan_cfg(const struct sun4i_i2s *i2s,
 	regmap_update_bits(i2s->regmap, SUN4I_I2S_FMT0_REG,
 			   SUN8I_I2S_FMT0_LRCK_PERIOD_MASK,
 			   SUN8I_I2S_FMT0_LRCK_PERIOD(lrck_period));
-
-	regmap_update_bits(i2s->regmap, SUN4I_I2S_FMT0_REG,
-			   SUN8I_I2S_FMT0_SLOT_WIDTH_MASK,0x7);
 
 	regmap_update_bits(i2s->regmap, SUN8I_I2S_TX_CHAN_SEL_REG,
 			   SUN8I_I2S_TX_CHAN_EN_MASK,
@@ -486,7 +485,6 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
 	int ret, sr, wss;
 	u32 width;
 
-    slot_width = 32;
 	if (i2s->slots)
 		slots = i2s->slots;
 
@@ -517,7 +515,6 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
 	wss = i2s->variant->get_wss(i2s, slot_width);
 	if (wss < 0)
 		return -EINVAL;
-    printk("get wss %d \n", wss);
 
 	regmap_field_write(i2s->field_fmt_wss, wss);
 	regmap_field_write(i2s->field_fmt_sr, sr);
@@ -529,7 +526,7 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
 static int sun4i_i2s_set_soc_fmt(const struct sun4i_i2s *i2s,
 				 unsigned int fmt)
 {
-	u32 val, val_kat;
+	u32 val;
 
 	/* DAI clock polarity */
 	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
@@ -584,11 +581,13 @@ static int sun4i_i2s_set_soc_fmt(const struct sun4i_i2s *i2s,
 	case SND_SOC_DAIFMT_CBS_CFS:
 		/* BCLK and LRCLK master */
 		val = SUN4I_I2S_CTRL_MODE_MASTER;
+        bit_clk_master = true;
 		break;
 
 	case SND_SOC_DAIFMT_CBM_CFM:
 		/* BCLK and LRCLK slave */
 		val = SUN4I_I2S_CTRL_MODE_SLAVE;
+        bit_clk_master = false;
 		break;
 
 	default:
@@ -597,15 +596,13 @@ static int sun4i_i2s_set_soc_fmt(const struct sun4i_i2s *i2s,
 	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
 			   SUN4I_I2S_CTRL_MODE_MASK, val);
 
-     regmap_read(i2s->regmap, SUN4I_I2S_CTRL_REG, &val_kat);
-     printk("sun4i_i2s_set_soc_fmt %d \n", val_kat);
 	return 0;
 }
 
 static int sun8i_i2s_set_soc_fmt(const struct sun4i_i2s *i2s,
 				 unsigned int fmt)
 {
-	u32 mode, val, val_kat;
+	u32 mode, val;
 	u8 offset;
 
 	/*
@@ -640,9 +637,6 @@ static int sun8i_i2s_set_soc_fmt(const struct sun4i_i2s *i2s,
 			   SUN8I_I2S_FMT0_LRCLK_POLARITY_MASK |
 			   SUN8I_I2S_FMT0_BCLK_POLARITY_MASK,
 			   val);
-
-    regmap_update_bits(i2s->regmap, SUN4I_I2S_FMT0_REG,
-                      SUN8I_I2S_FMT0_SLOT_WIDTH_MASK, 0x7);
 
 	/* DAI Mode */
 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
@@ -689,11 +683,13 @@ static int sun8i_i2s_set_soc_fmt(const struct sun4i_i2s *i2s,
 	case SND_SOC_DAIFMT_CBS_CFS:
 		/* BCLK and LRCLK master */
 		val = SUN8I_I2S_CTRL_BCLK_OUT |	SUN8I_I2S_CTRL_LRCK_OUT;
+        bit_clk_master = true;
 		break;
 
 	case SND_SOC_DAIFMT_CBM_CFM:
 		/* BCLK and LRCLK slave */
 		val = 0;
+        bit_clk_master = false;
 		break;
 
 	default:
@@ -704,8 +700,6 @@ static int sun8i_i2s_set_soc_fmt(const struct sun4i_i2s *i2s,
 			   SUN8I_I2S_CTRL_BCLK_OUT | SUN8I_I2S_CTRL_LRCK_OUT,
 			   val);
 
-     regmap_read(i2s->regmap, SUN4I_I2S_CTRL_REG, &val_kat);
-     printk("sun8i_i2s_set_soc_fmt %x \n", val_kat);
 	return 0;
 }
 
@@ -734,9 +728,6 @@ static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 
 static void sun4i_i2s_start_capture(struct sun4i_i2s *i2s)
 {
-    u32 val_kat;
-
-    printk("sun4i_i2s_start_capture \n");
 	/* Flush RX FIFO */
 	regmap_update_bits(i2s->regmap, SUN4I_I2S_FIFO_CTRL_REG,
 			   SUN4I_I2S_FIFO_CTRL_FLUSH_RX,
@@ -754,19 +745,6 @@ static void sun4i_i2s_start_capture(struct sun4i_i2s *i2s)
 	regmap_update_bits(i2s->regmap, SUN4I_I2S_DMA_INT_CTRL_REG,
 			   SUN4I_I2S_DMA_INT_CTRL_RX_DRQ_EN,
 			   SUN4I_I2S_DMA_INT_CTRL_RX_DRQ_EN);
-
-    regmap_read(i2s->regmap, SUN4I_I2S_CTRL_REG, &val_kat);
-    printk("sun4i_i2s_start_capture SUN4I_I2S_CTRL_REG %x \n", val_kat);
-
-    val_kat = 0;
-
-    regmap_read(i2s->regmap, SUN4I_I2S_DMA_INT_CTRL_REG, &val_kat);
-    printk("sun4i_i2s_start_capture SUN4I_I2S_DMA_INT_CTRL_REG %x \n", val_kat);
-
-    val_kat = 0;
-
-    regmap_read(i2s->regmap, SUN4I_I2S_FMT0_REG, &val_kat);
-    printk("sun4i_i2s_start_capture SUN4I_I2S_FMT0_REG %x \n", val_kat);
 }
 
 static void sun4i_i2s_start_playback(struct sun4i_i2s *i2s)
@@ -792,7 +770,6 @@ static void sun4i_i2s_start_playback(struct sun4i_i2s *i2s)
 
 static void sun4i_i2s_stop_capture(struct sun4i_i2s *i2s)
 {
-    printk("sun4i_i2s_stop_capture \n");
 	/* Disable RX Block */
 	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
 			   SUN4I_I2S_CTRL_RX_EN,
@@ -901,15 +878,15 @@ static struct snd_soc_dai_driver sun4i_i2s_dai = {
 	.probe = sun4i_i2s_dai_probe,
 	.capture = {
 		.stream_name = "Capture",
-		.channels_min = 2,
-		.channels_max = 2,
+		.channels_min = 1,
+		.channels_max = 8,
 		.rates = SNDRV_PCM_RATE_8000_192000,
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
 	},
 	.playback = {
 		.stream_name = "Playback",
-		.channels_min = 2,
-		.channels_max = 2,
+		.channels_min = 1,
+		.channels_max = 8,
 		.rates = SNDRV_PCM_RATE_8000_192000,
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
 	},
@@ -994,7 +971,7 @@ static const struct reg_default sun4i_i2s_reg_defaults[] = {
 
 static const struct reg_default sun8i_i2s_reg_defaults[] = {
 	{ SUN4I_I2S_CTRL_REG, 0x00060000 },
-	{ SUN4I_I2S_FMT0_REG, 0x00000037 },
+	{ SUN4I_I2S_FMT0_REG, 0x00000033 },
 	{ SUN4I_I2S_FMT1_REG, 0x00000030 },
 	{ SUN4I_I2S_FIFO_CTRL_REG, 0x000400f0 },
 	{ SUN4I_I2S_DMA_INT_CTRL_REG, 0x00000000 },
@@ -1037,8 +1014,7 @@ static int sun4i_i2s_runtime_resume(struct device *dev)
 {
 	struct sun4i_i2s *i2s = dev_get_drvdata(dev);
 	int ret;
-    u32 val_kat, val;
-    printk("sun4i_i2s_runtime_resume\n");
+
 	ret = clk_prepare_enable(i2s->bus_clk);
 	if (ret) {
 		dev_err(dev, "Failed to enable bus clock\n");
@@ -1053,36 +1029,6 @@ static int sun4i_i2s_runtime_resume(struct device *dev)
 		dev_err(dev, "Failed to sync regmap cache\n");
 		goto err_disable_clk;
 	}
-/*
-    val = 0;
-
-	regmap_update_bits(i2s->regmap, SUN4I_I2S_FMT0_REG,
-			   SUN4I_I2S_FMT0_LRCLK_POLARITY_MASK |
-			   SUN4I_I2S_FMT0_BCLK_POLARITY_MASK,
-			   val);
-
-    val = SUN4I_I2S_FMT0_FMT_I2S;
-
-	regmap_update_bits(i2s->regmap, SUN4I_I2S_FMT0_REG,
-			   SUN4I_I2S_FMT0_FMT_MASK, val);*/
-
-// 	/* DAI clock master masks */
-// 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
-// 	case SND_SOC_DAIFMT_CBS_CFS:
-// 		/* BCLK and LRCLK master */
-// 		val = SUN4I_I2S_CTRL_MODE_MASTER;
-// 		break;
-//
-// 	case SND_SOC_DAIFMT_CBM_CFM:
-// 		/* BCLK and LRCLK slave */
-// 		val = SUN4I_I2S_CTRL_MODE_SLAVE;
-// 		break;
-//
-// 	default:
-// 		return -EINVAL;
-// 	}
-// 	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-// 			   SUN4I_I2S_CTRL_MODE_MASK, val);
 
 	/* Enable the whole hardware block */
 	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
@@ -1093,31 +1039,11 @@ static int sun4i_i2s_runtime_resume(struct device *dev)
 			   SUN4I_I2S_CTRL_SDO_EN_MASK,
 			   SUN4I_I2S_CTRL_SDO_EN(0));
 
-
 	ret = clk_prepare_enable(i2s->mod_clk);
 	if (ret) {
 		dev_err(dev, "Failed to enable module clock\n");
 		goto err_disable_clk;
 	}
-
-    ret = regcache_sync(i2s->regmap);
-	if (ret) {
-		dev_err(dev, "Failed to sync regmap cache\n");
-		goto err_disable_clk;
-	}
-
-     regmap_read(i2s->regmap, SUN4I_I2S_CTRL_REG, &val_kat);
-     printk("sun4i_i2s_runtime_resume SUN4I_I2S_CTRL_REG %x \n", val_kat);
-
-     val_kat = 0;
-
-    regmap_read(i2s->regmap, SUN4I_I2S_CLK_DIV_REG, &val_kat);
-     printk("sun4i_i2s_runtime_resume SUN4I_I2S_CLK_DIV_REG %x \n", val_kat);
-
-     val_kat = 0;
-
-    regmap_read(i2s->regmap, SUN4I_I2S_FMT0_REG, &val_kat);
-     printk("sun4i_i2s_runtime_resume SUN4I_I2S_FMT0_REG %x \n", val_kat);
 
 	return 0;
 
@@ -1129,7 +1055,6 @@ err_disable_clk:
 static int sun4i_i2s_runtime_suspend(struct device *dev)
 {
 	struct sun4i_i2s *i2s = dev_get_drvdata(dev);
-    u32 val_kat;
 
 	clk_disable_unprepare(i2s->mod_clk);
 
@@ -1144,10 +1069,6 @@ static int sun4i_i2s_runtime_suspend(struct device *dev)
 	regcache_cache_only(i2s->regmap, true);
 
 	clk_disable_unprepare(i2s->bus_clk);
-
-
-     regmap_read(i2s->regmap, SUN4I_I2S_CTRL_REG, &val_kat);
-     printk("sun4i_i2s_runtime_suspend %d \n", val_kat);
 
 	return 0;
 }
@@ -1270,65 +1191,6 @@ static int sun4i_i2s_init_regmap_fields(struct device *dev,
 
 	return 0;
 }
-/* --- audio card --- */
-
-static struct device_node *sun8i_get_codec(struct device *dev)
-{
-	struct device_node *ep, *remote;
-
-	ep = of_graph_get_next_endpoint(dev->of_node, NULL);
-	if (!ep)
-		return NULL;
-	remote = of_graph_get_remote_port_parent(ep);
-	of_node_put(ep);
-
-	return remote;
-}
-static int sun8i_card_create(struct device *dev, struct sun4i_i2s *priv)
-{
-	struct snd_soc_card *card;
-	struct snd_soc_dai_link *dai_link;
-	struct snd_soc_dai_link_component *codec;
-
-	card = devm_kzalloc(dev, sizeof(*card), GFP_KERNEL);
-	if (!card)
-		return -ENOMEM;
-	dai_link = devm_kzalloc(dev, sizeof(*dai_link), GFP_KERNEL);
-	if (!dai_link)
-		return -ENOMEM;
-	codec = devm_kzalloc(dev, sizeof(*codec), GFP_KERNEL);
-	if (!codec)
-		return -ENOMEM;
-
-#if 0
-	codec->of_node = sun8i_get_codec(dev);
-	if (!codec->of_node) {
-		dev_err(dev, "no port node\n");
-		return -ENXIO;
-	}
-#endif
-	card->name = "snd-soc-dummy";
-	card->dai_link = dai_link;
-	card->num_links = 1;
-	dai_link->name = "snd-soc-dummy-dai";
-	dai_link->stream_name = "snd-soc-dummy-dai";
-//  	dai_link->platform_name = dev_name(dev);
-//  	dai_link->cpu_name = dev_name(dev);
-	/* the DAI name must be the name of codec node */
-     codec->name = "snd-soc-dummy";
-    codec->dai_name = "snd-soc-dummy-dai";
-
-	dai_link->codecs = codec;
-	dai_link->num_codecs = 1;
-
-
-
-	card->dev = dev;
-	dev_set_drvdata(dev, card);
-	snd_soc_card_set_drvdata(card, priv);
-
-	return devm_snd_soc_register_card(dev, card);
-}
 
 static int sun4i_i2s_probe(struct platform_device *pdev)
 {
@@ -1336,8 +1198,8 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
 	struct resource *res;
 	void __iomem *regs;
 	int irq, ret;
-    printk("sun4i_i2s_probe !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-	i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
+
+    i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
 	if (!i2s)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, i2s);
@@ -1353,33 +1215,33 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
 
 	i2s->variant = of_device_get_match_data(&pdev->dev);
 	if (!i2s->variant) {
-		printk( "Failed to determine the quirks to use\n");
+		dev_err(&pdev->dev, "Failed to determine the quirks to use\n");
 		return -ENODEV;
 	}
 
 	i2s->bus_clk = devm_clk_get(&pdev->dev, "apb");
 	if (IS_ERR(i2s->bus_clk)) {
-		printk( "Can't get our bus clock\n");
+		dev_err(&pdev->dev, "Can't get our bus clock\n");
 		return PTR_ERR(i2s->bus_clk);
 	}
 
 	i2s->regmap = devm_regmap_init_mmio(&pdev->dev, regs,
 					    i2s->variant->sun4i_i2s_regmap);
 	if (IS_ERR(i2s->regmap)) {
-		printk( "Regmap initialisation failed\n");
+		dev_err(&pdev->dev, "Regmap initialisation failed\n");
 		return PTR_ERR(i2s->regmap);
 	}
 
 	i2s->mod_clk = devm_clk_get(&pdev->dev, "mod");
 	if (IS_ERR(i2s->mod_clk)) {
-		printk( "Can't get our mod clock\n");
+		dev_err(&pdev->dev, "Can't get our mod clock\n");
 		return PTR_ERR(i2s->mod_clk);
 	}
 
 	if (i2s->variant->has_reset) {
 		i2s->rst = devm_reset_control_get_exclusive(&pdev->dev, NULL);
 		if (IS_ERR(i2s->rst)) {
-			printk( "Failed to get reset control\n");
+			dev_err(&pdev->dev, "Failed to get reset control\n");
 			return PTR_ERR(i2s->rst);
 		}
 	}
@@ -1387,12 +1249,11 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
 	if (!IS_ERR(i2s->rst)) {
 		ret = reset_control_deassert(i2s->rst);
 		if (ret) {
-			printk("Failed to deassert the reset control\n");
+			dev_err(&pdev->dev,
+                    "Failed to deassert the reset control\n");
 			return -EINVAL;
 		}
 	}
-
-	printk("i2s->playback_dma_data.addr\n");
 
 	i2s->playback_dma_data.addr = res->start +
 					i2s->variant->reg_offset_txdata;
@@ -1407,34 +1268,26 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
 		if (ret)
 			goto err_pm_disable;
 	}
-printk("sun4i_i2s_init_regmap_fields\n");
+
 	ret = sun4i_i2s_init_regmap_fields(&pdev->dev, i2s);
 	if (ret) {
 		dev_err(&pdev->dev, "Could not initialise regmap fields\n");
 		goto err_suspend;
 	}
-printk("devm_snd_dmaengine_pcm_register\n");
+
 	ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
 	if (ret) {
 		dev_err(&pdev->dev, "Could not register PCM\n");
 		goto err_suspend;
 	}
-printk("devm_snd_soc_register_component\n");
 
 	ret = devm_snd_soc_register_component(&pdev->dev,
 					      &sun4i_i2s_component,
 					      &sun4i_i2s_dai, 1);
 	if (ret) {
-		printk( "Could not register DAI\n");
+		dev_err(&pdev->dev, "Could not register DAI\n");
 		goto err_suspend;
 	}
-
-//	ret = sun8i_card_create(&pdev->dev, i2s);
-//	if (ret) {
-//		if (ret != -EPROBE_DEFER)
-//			printk("register card failed %d\n", ret);
-//		goto err_suspend;
-//	}
 
 	return 0;
 
