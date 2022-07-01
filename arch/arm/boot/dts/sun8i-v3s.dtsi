@@ -334,6 +334,11 @@
 				function = "i2c1";
 			};
 
+            i2s0_pins: i2s0-pins {
+                pins = "PG10", "PG11", "PG13";
+                function = "i2s";
+            };
+
 			uart0_pb_pins: uart0-pb-pins {
 				pins = "PB8", "PB9";
 				function = "uart0";
@@ -391,6 +396,21 @@
 			compatible = "allwinner,sun4i-a10-lradc-keys";
 			reg = <0x01c22800 0x400>;
 			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+			status = "disabled";
+		};
+
+        i2s0: i2s@1c22000 {
+			#sound-dai-cells = <0>;
+			compatible = "allwinner,sun8i-h3-i2s";
+			reg = <0x01c22000 0x400>;
+			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
+            clocks = <&ccu CLK_BUS_I2S0>, <&ccu CLK_I2S0>;
+			clock-names = "apb", "mod";
+			dmas = <&dma 3>, <&dma 3>;
+			resets = <&ccu RST_BUS_I2S0>;
+            pinctrl-names = "default";
+            pinctrl-0 = <&i2s0_pins>;
+			dma-names = "rx", "tx";
 			status = "disabled";
 		};
 

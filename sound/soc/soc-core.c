@@ -1988,8 +1988,7 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 	ret = snd_card_new(card->dev, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1,
 			card->owner, 0, &card->snd_card);
 	if (ret < 0) {
-		dev_err(card->dev,
-			"ASoC: can't create sound card for card %s: %d\n",
+		dev_err(card->dev, "ASoC: can't create sound card for card %s: %d\n",
 			card->name, ret);
 		goto probe_end;
 	}
@@ -2018,8 +2017,7 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 	/* probe all components used by DAI links on this card */
 	ret = soc_probe_link_components(card);
 	if (ret < 0) {
-		dev_err(card->dev,
-			"ASoC: failed to instantiate card %d\n", ret);
+		dev_err(card->dev, "ASoC: failed to instantiate card %d\n", ret);
 		goto probe_end;
 	}
 
@@ -2047,8 +2045,7 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 	/* probe all DAI links on this card */
 	ret = soc_probe_link_dais(card);
 	if (ret < 0) {
-		dev_err(card->dev,
-			"ASoC: failed to instantiate card %d\n", ret);
+		dev_err(card->dev, "ASoC: failed to instantiate card %d\n", ret);
 		goto probe_end;
 	}
 
@@ -2354,7 +2351,7 @@ static int snd_soc_bind_card(struct snd_soc_card *card)
 	struct snd_soc_pcm_runtime *rtd;
 	int ret;
 
-	ret = snd_soc_instantiate_card(card);
+    ret = snd_soc_instantiate_card(card);
 	if (ret != 0)
 		return ret;
 
@@ -2593,7 +2590,7 @@ static int snd_soc_register_dais(struct snd_soc_component *component,
 	unsigned int i;
 	int ret;
 
-	dev_dbg(dev, "ASoC: dai register %s #%zu\n", dev_name(dev), count);
+	dev_err(dev, "ASoC: dai register %s #%zu\n", dev_name(dev), count);
 
 	for (i = 0; i < count; i++) {
 
@@ -2663,7 +2660,6 @@ static int snd_soc_component_initialize(struct snd_soc_component *component,
 	INIT_LIST_HEAD(&component->dobj_list);
 	INIT_LIST_HEAD(&component->card_list);
 	mutex_init(&component->io_mutex);
-
 	component->name = fmt_single_name(dev, &component->id);
 	if (!component->name) {
 		dev_err(dev, "ASoC: Failed to allocate name\n");
@@ -2729,7 +2725,6 @@ EXPORT_SYMBOL_GPL(snd_soc_component_exit_regmap);
 static void snd_soc_component_add(struct snd_soc_component *component)
 {
 	mutex_lock(&client_mutex);
-
 	if (!component->driver->write && !component->driver->read) {
 		if (!component->regmap)
 			component->regmap = dev_get_regmap(component->dev,
@@ -2798,10 +2793,10 @@ static void convert_endianness_formats(struct snd_soc_pcm_stream *stream)
 static void snd_soc_try_rebind_card(void)
 {
 	struct snd_soc_card *card, *c;
-
-	list_for_each_entry_safe(card, c, &unbind_card_list, list)
+	list_for_each_entry_safe(card, c, &unbind_card_list, list){
 		if (!snd_soc_bind_card(card))
 			list_del(&card->list);
+    }
 }
 
 int snd_soc_add_component(struct device *dev,
@@ -2813,7 +2808,7 @@ int snd_soc_add_component(struct device *dev,
 	int ret;
 	int i;
 
-	ret = snd_soc_component_initialize(component, component_driver, dev);
+    ret = snd_soc_component_initialize(component, component_driver, dev);
 	if (ret)
 		goto err_free;
 

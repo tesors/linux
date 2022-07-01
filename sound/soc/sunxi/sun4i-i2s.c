@@ -15,6 +15,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 #include <linux/reset.h>
+#include <linux/of_graph.h>
 
 #include <sound/dmaengine_pcm.h>
 #include <sound/pcm_params.h>
@@ -104,6 +105,7 @@
 #define SUN8I_I2S_FMT0_BCLK_POLARITY_MASK	BIT(7)
 #define SUN8I_I2S_FMT0_BCLK_POLARITY_INVERTED		(1 << 7)
 #define SUN8I_I2S_FMT0_BCLK_POLARITY_NORMAL		(0 << 7)
+#define SUN8I_I2S_FMT0_SLOT_WIDTH_MASK	GENMASK(2, 0)
 
 #define SUN8I_I2S_INT_STA_REG		0x0c
 #define SUN8I_I2S_FIFO_TX_REG		0x20
@@ -181,6 +183,8 @@ struct sun4i_i2s {
 	const struct sun4i_i2s_quirks	*variant;
 };
 
+static bool bit_clk_master;
+
 struct sun4i_i2s_clk_div {
 	u8	div;
 	u8	val;
@@ -245,7 +249,6 @@ static int sun4i_i2s_get_bclk_div(struct sun4i_i2s *i2s,
 	const struct sun4i_i2s_clk_div *dividers = i2s->variant->bclk_dividers;
 	int div = parent_rate / sampling_rate / word_size / channels;
 	int i;
-
 	for (i = 0; i < i2s->variant->num_bclk_dividers; i++) {
 		const struct sun4i_i2s_clk_div *bdiv = &dividers[i];
 
@@ -296,63 +299,67 @@ static int sun4i_i2s_set_clk_rate(struct snd_soc_dai *dai,
 	int bclk_div, mclk_div;
 	int ret;
 
-	switch (rate) {
-	case 176400:
-	case 88200:
-	case 44100:
-	case 22050:
-	case 11025:
-		clk_rate = 22579200;
-		break;
 
-	case 192000:
-	case 128000:
-	case 96000:
-	case 64000:
-	case 48000:
-	case 32000:
-	case 24000:
-	case 16000:
-	case 12000:
-	case 8000:
-		clk_rate = 24576000;
-		break;
+	if (bit_clk_master) {
+        switch (rate) {
+        case 176400:
+        case 88200:
+        case 44100:
+        case 22050:
+        case 11025:
+            clk_rate = 22579200;
+            break;
 
-	default:
-		dev_err(dai->dev, "Unsupported sample rate: %u\n", rate);
-		return -EINVAL;
-	}
+        case 192000:
+        case 128000:
+        case 96000:
+        case 64000:
+        case 48000:
+        case 32000:
+        case 24000:
+        case 16000:
+        case 12000:
+        case 8000:
+            clk_rate = 24576000;
+            break;
 
-	ret = clk_set_rate(i2s->mod_clk, clk_rate);
-	if (ret)
-		return ret;
+        default:
+            dev_err(dai->dev, "Unsupported sample rate: %u\n", rate);
+            return -EINVAL;
+        }
 
-	oversample_rate = i2s->mclk_freq / rate;
-	if (!sun4i_i2s_oversample_is_valid(oversample_rate)) {
-		dev_err(dai->dev, "Unsupported oversample rate: %d\n",
-			oversample_rate);
-		return -EINVAL;
-	}
+        ret = clk_set_rate(i2s->mod_clk, clk_rate);
+        if (ret)
+            return ret;
 
-	bclk_parent_rate = i2s->variant->get_bclk_parent_rate(i2s);
-	bclk_div = sun4i_i2s_get_bclk_div(i2s, bclk_parent_rate,
-					  rate, slots, slot_width);
-	if (bclk_div < 0) {
-		dev_err(dai->dev, "Unsupported BCLK divider: %d\n", bclk_div);
-		return -EINVAL;
-	}
+        oversample_rate = i2s->mclk_freq / rate;
+        if (!sun4i_i2s_oversample_is_valid(oversample_rate)) {
+            dev_err(dai->dev, "Unsupported oversample rate: %d\n",
+                oversample_rate);
+            return -EINVAL;
+        }
 
-	mclk_div = sun4i_i2s_get_mclk_div(i2s, clk_rate, i2s->mclk_freq);
-	if (mclk_div < 0) {
-		dev_err(dai->dev, "Unsupported MCLK divider: %d\n", mclk_div);
-		return -EINVAL;
-	}
+        bclk_parent_rate = i2s->variant->get_bclk_parent_rate(i2s);
+        bclk_div = sun4i_i2s_get_bclk_div(i2s, bclk_parent_rate,
+                        rate, slots, slot_width);
+        if (bclk_div < 0) {
+            dev_err(dai->dev, "Unsupported BCLK divider: %d\n", bclk_div);
+            return -EINVAL;
+        }
 
-	regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
-		     SUN4I_I2S_CLK_DIV_BCLK(bclk_div) |
-		     SUN4I_I2S_CLK_DIV_MCLK(mclk_div));
+        mclk_div = sun4i_i2s_get_mclk_div(i2s, clk_rate, i2s->mclk_freq);
+        if (mclk_div < 0) {
+            dev_err(dai->dev, "Unsupported MCLK divider: %d\n", mclk_div);
+            return -EINVAL;
+        }
 
-	regmap_field_write(i2s->field_clkdiv_mclk_en, 1);
+        regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
+                SUN4I_I2S_CLK_DIV_BCLK(bclk_div) |
+                SUN4I_I2S_CLK_DIV_MCLK(mclk_div));
+
+        regmap_field_write(i2s->field_clkdiv_mclk_en, 1);
+    } else
+        regmap_field_write(i2s->field_clkdiv_mclk_en, 0);
 
 	return 0;
 }
@@ -574,11 +581,13 @@ static int sun4i_i2s_set_soc_fmt(const struct sun4i_i2s *i2s,
 	case SND_SOC_DAIFMT_CBS_CFS:
 		/* BCLK and LRCLK master */
 		val = SUN4I_I2S_CTRL_MODE_MASTER;
+        bit_clk_master = true;
 		break;
 
 	case SND_SOC_DAIFMT_CBM_CFM:
 		/* BCLK and LRCLK slave */
 		val = SUN4I_I2S_CTRL_MODE_SLAVE;
+        bit_clk_master = false;
 		break;
 
 	default:
@@ -586,6 +595,7 @@ static int sun4i_i2s_set_soc_fmt(const struct sun4i_i2s *i2s,
 	}
 	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
 			   SUN4I_I2S_CTRL_MODE_MASK, val);
+
 	return 0;
 }
 
@@ -673,11 +683,13 @@ static int sun8i_i2s_set_soc_fmt(const struct sun4i_i2s *i2s,
 	case SND_SOC_DAIFMT_CBS_CFS:
 		/* BCLK and LRCLK master */
 		val = SUN8I_I2S_CTRL_BCLK_OUT |	SUN8I_I2S_CTRL_LRCK_OUT;
+        bit_clk_master = true;
 		break;
 
 	case SND_SOC_DAIFMT_CBM_CFM:
 		/* BCLK and LRCLK slave */
 		val = 0;
+        bit_clk_master = false;
 		break;
 
 	default:
@@ -1187,7 +1199,7 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
 	void __iomem *regs;
 	int irq, ret;
 
-	i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
+    i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
 	if (!i2s)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, i2s);
@@ -1238,7 +1250,7 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
 		ret = reset_control_deassert(i2s->rst);
 		if (ret) {
 			dev_err(&pdev->dev,
-				"Failed to deassert the reset control\n");
+                    "Failed to deassert the reset control\n");
 			return -EINVAL;
 		}
 	}
