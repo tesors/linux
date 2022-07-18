@@ -41,8 +41,11 @@
 //#define TC358743_VOUT_RGB
 
 #define TC358743_WAIT_FOR_FORMAT_CHANGE _IOWR('V', BASE_VIDIOC_PRIVATE, unsigned int)
+#define TC358743_WAIT_FOR_METADATA_CHANGE _IOWR('V', BASE_VIDIOC_PRIVATE + 1, unsigned int)
+#define TC358743_READ_METADATA _IOWR('V', BASE_VIDIOC_PRIVATE + 2, unsigned long)
 
-static DECLARE_WAIT_QUEUE_HEAD(wq);
+static DECLARE_WAIT_QUEUE_HEAD(wq_format);
+static DECLARE_WAIT_QUEUE_HEAD(wq_metadata);
 
 static int tc358743_s_dv_timings(struct v4l2_subdev *sd,
 				                 struct v4l2_dv_timings *timings);
@@ -84,7 +87,9 @@ struct camera_common_frmfmt {
 	int	mode;
 };
 
-atomic_t fifo_critical;
+atomic_t fifo_critical_format;
+atomic_t fifo_critical_metadata;
+uint8_t *metadata_buff;
 
 /* frame format */
 static const struct camera_common_frmfmt tc358743_frmfmt[] = {
@@ -145,7 +150,7 @@ static u8 edid[] = {
 #else
     0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,
     0x52,0x62,0x88,0x88,0x00,0x88,0x88,0x88,
-    0x1C,0x15,0x01,0x03,0x80,0x00,0x00,0x78,
+    0x1C,0x15,0x01,0x04,0x80,0x00,0x00,0x78,
     0x0A,0x0D,0xC9,0xA0,0x57,0x47,0x98,0x27,
     0x12,0x48,0x4C,0x00,0x00,0x00,0x01,0x00,
     0x01,0x00,0x01,0x00,0x01,0x00,0x01,0x00,
@@ -158,13 +163,14 @@ static u8 edid[] = {
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xFC,
     0x00,0x54,0x6F,0x73,0x68,0x69,0x62,0x61,
-    0x2D,0x48,0x32,0x43,0x0A,0x20,0x01,0x72,
-    0x02,0x03,0x29,0x41,0x4D,0x20,0x21,0x04,
+    0x2D,0x48,0x32,0x43,0x0A,0x20,0x01,0x71,
+    0x02,0x03,0x31,0x41,0x4D,0x20,0x21,0x04,
     0x13,0x3D,0x1F,0x05,0x06,0x14,0x15,0x22,
     0x3C,0x3E,0x23,0x0F,0x07,0x07,0x83,0xFF,
     0x07,0x00,0x6E,0x03,0x0C,0x00,0x10,0x00,
     0x38,0x3C,0x2F,0x00,0x80,0x01,0x02,0x03,
-    0x04,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x04,0xE7,0x20,0x00,0x01,0x01,0xF0,0xF9,
+    0x5C,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -173,8 +179,7 @@ static u8 edid[] = {
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3D,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xE7,
 #endif
 };
 /* Max transfer size done by I2C transfer functions */
@@ -603,7 +608,7 @@ static void tc358743_erase_bksv(struct v4l2_subdev *sd)
 		i2c_wr8(sd, BKSV + i, 0);
 }
 
-/* --------------- AVI infoframe --------------- */
+/* --------------- infoframes --------------- */
 
 static void print_avi_infoframe(struct v4l2_subdev *sd)
 {
@@ -625,6 +630,24 @@ static void print_avi_infoframe(struct v4l2_subdev *sd)
 	}
 
 	hdmi_infoframe_log(KERN_INFO, dev, &frame);
+}
+
+static void read_vendor_specific_infoframe(struct v4l2_subdev *sd)
+{
+	if (!is_hdmi(sd)) {
+		v4l2_info(sd, "DVI-D signal - VS infoframe not supported\n");
+		return;
+	}
+
+    i2c_rd(sd, PK_VS_0HEAD, metadata_buff, VS_BUFFER_SIZE);
+
+	if (metadata_buff[0] != HDMI_INFOFRAME_TYPE_VENDOR ||
+	    metadata_buff[1] != 0x1)
+		return;
+
+    /* set fifo_critical counter to one */
+    atomic_set(&fifo_critical_metadata, 1);
+    wake_up_interruptible(&wq_metadata);
 }
 
 /* --------------- CTRLS --------------- */
@@ -1095,6 +1118,8 @@ static void tc358743_set_hdmi_info_frame_mode(struct v4l2_subdev *sd)
 	i2c_wr8(sd, ERR_PK_LIMIT,0x01);
 	i2c_wr8(sd, NO_PKT_LIMIT2,0x30);
 	i2c_wr8(sd, NO_GDB_LIMIT,0x10);
+    i2c_wr8(sd, VS_IEEE_SEL, 0x0);
+    i2c_wr8(sd, TYP_VS_SET, 0x81);
 }
 
 static void tc358743_initial_setup(struct v4l2_subdev *sd)
@@ -1149,8 +1174,8 @@ static void tc358743_format_change(struct v4l2_subdev *sd)
         memset(&state->timings, 0, sizeof(state->timings));
 
         /* set fifo_critical counter to one */
-        atomic_set(&fifo_critical, 1);
-        wake_up_interruptible(&wq);
+        atomic_set(&fifo_critical_format, 1);
+        wake_up_interruptible(&wq_format);
 
 		v4l2_info(sd, "%s: Format changed. No signal\n", __func__);
 	} else {
@@ -1160,8 +1185,8 @@ static void tc358743_format_change(struct v4l2_subdev *sd)
         /* automaticly set timing rather than set by userspace */
         if (tc358743_s_dv_timings(sd, &timings) == 0) {
             /* set fifo_critical counter to one */
-            atomic_set(&fifo_critical, 1);
-            wake_up_interruptible(&wq);
+            atomic_set(&fifo_critical_format, 1);
+            wake_up_interruptible(&wq_format);
             v4l2_print_dv_timings(sd->name,
 				"tc358743_format_change: Format change`d. New format: ",	&timings, false);
         }
@@ -1194,6 +1219,7 @@ static void tc358743_enable_interrupts(struct v4l2_subdev *sd, bool cable_connec
 					MASK_M_AF_UNLOCK) &0xff);
 		i2c_wr8(sd, AUDIO_INTM, ~MASK_M_BUFINIT_END);
 		i2c_wr8(sd, MISC_INTM, ~MASK_M_SYNC_CHG);
+        i2c_wr8(sd, PACKET_INTM, ~M_PK_VS);
 	} else {
 		i2c_wr8(sd, SYS_INTM, ~MASK_M_DDC &0xff);
 		i2c_wr8(sd, CLK_INTM,0xff);
@@ -1319,6 +1345,25 @@ static void tc358743_hdmi_clk_int_handler(struct v4l2_subdev *sd, bool *handled)
 	if (clk_int) {
 		v4l2_err(sd, "%s: Unhandled CLK_INT interrupts:0x%02x\n", __func__, clk_int);
 	}
+}
+
+static void tc358743_hdmi_info_int_handler(struct v4l2_subdev *sd, bool *handled)
+{
+    u8 packet_int_mask = i2c_rd8(sd, PACKET_INTM);
+	u8 packet_int = i2c_rd8(sd, PACKET_INT) & ~packet_int_mask;
+
+	i2c_wr8(sd, PACKET_INT, packet_int);
+
+// 	v4l2_info(sd, "%s: PACKET_INT =0x%02x\n", __func__, packet_int);
+
+	if (packet_int & MASK_I_PK_VS) {
+        read_vendor_specific_infoframe(sd);
+
+		packet_int &= ~MASK_I_PK_VS;
+		if (handled)
+			*handled = true;
+	}
+
 }
 
 static void tc358743_enable_edid(struct v4l2_subdev *sd)
@@ -1486,7 +1531,7 @@ static int tc358743_isr(struct v4l2_subdev *sd, u32 status, bool *handled)
 {
 	u16 intstatus = i2c_rd16(sd, INTSTATUS);
 
-	v4l2_info(sd, "%s: IntStatus =0x%04x\n", __func__, intstatus);
+// 	v4l2_info(sd, "%s: IntStatus =0x%04x\n", __func__, intstatus);
 
 	if (intstatus & MASK_HDMI_INT) {
 		u8 hdmi_int0 = i2c_rd8(sd, HDMI_INT0);
@@ -1502,6 +1547,8 @@ static int tc358743_isr(struct v4l2_subdev *sd, u32 status, bool *handled)
 			tc358743_hdmi_sys_int_handler(sd, handled);
 		if (hdmi_int1 & MASK_I_AUD)
 			tc358743_hdmi_audio_int_handler(sd, handled);
+        if (hdmi_int1 & MASK_I_PACKET)
+            tc358743_hdmi_info_int_handler(sd, handled);
 
 		i2c_wr16(sd, INTSTATUS, MASK_HDMI_INT);
 		intstatus &= ~MASK_HDMI_INT;
@@ -2030,14 +2077,34 @@ static int tc358743_s_power(struct v4l2_subdev *sd, int on)
 	return 0;
 }
 
+ /* moves block of memory from kernel to userspace */
+ static ssize_t metadata_to_userspace(char __user *buf)
+ {
+    int status=0;
+    /* Total size of vs_infoframe = vs_infoframe header size + size written in 3rd byte of vs_infoframe(1.4 HDMI Spec). */
+    status=copy_to_user(buf,metadata_buff, metadata_buff[2] + HDMI_INFOFRAME_HEADER_SIZE - 1);
+    if (status==0)
+        return 0;
+    else
+        return -EFAULT;
+ }
+
 static long tc358743_ioctl(struct v4l2_subdev *sd,
 			unsigned int cmd, void *arg)
 {
     switch (cmd) {
     case TC358743_WAIT_FOR_FORMAT_CHANGE:
         /* set fifo_critical counter to zero, in order to ignore all previous interrupts */
-        atomic_set(&fifo_critical, 0);
-        wait_event_interruptible(wq, atomic_read(&fifo_critical));
+        atomic_set(&fifo_critical_format, 0);
+        wait_event_interruptible(wq_format, atomic_read(&fifo_critical_format));
+        break;
+    case TC358743_WAIT_FOR_METADATA_CHANGE:
+        /* set fifo_critical counter to zero, in order to ignore all previous interrupts */
+        atomic_set(&fifo_critical_metadata, 0);
+        wait_event_interruptible(wq_metadata, atomic_read(&fifo_critical_metadata));
+        break;
+    case TC358743_READ_METADATA:
+        metadata_to_userspace(*(unsigned long*)arg);
         break;
     default:
         printk("Wrong TC358743 IOCTL cmd\n");
@@ -2308,7 +2375,15 @@ static int tc358743_probe(struct i2c_client *client)
 	int err;
 	u16 chip_id_val;
 
-    atomic_set(&fifo_critical, 0);
+    atomic_set(&fifo_critical_format, 0);
+    atomic_set(&fifo_critical_metadata, 0);
+
+    /* allocating memory metadata */
+    metadata_buff = kzalloc(VS_BUFFER_SIZE, GFP_KERNEL);
+	if (!metadata_buff) {
+		printk("Failed to allocate memory for camera metadata. \n");
+        return -ENOMEM;
+    }
 
     // pr_info("%s %s %s\n",__FUNCTION__,__DATE__,__TIME__);
 
@@ -2468,6 +2543,7 @@ err_work_queues:
 err_hdl:
 	media_entity_cleanup(&sd->entity);
 	v4l2_ctrl_handler_free(&state->hdl);
+    kfree(metadata_buff);
 	return err;
 }
 
@@ -2483,6 +2559,7 @@ static int tc358743_remove(struct i2c_client *client)
 	mutex_destroy(&state->confctl_mutex);
 	media_entity_cleanup(&sd->entity);
 	v4l2_ctrl_handler_free(&state->hdl);
+    kfree(metadata_buff);
 
 	return 0;
 }
