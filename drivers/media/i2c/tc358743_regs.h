@@ -311,6 +311,9 @@
 #define MASK_I_PHYCLK_CHG                     0x02
 #define MASK_I_TMDSCLK_CHG                    0x01
 
+#define PACKET_INT                            0x8504
+#define MASK_I_PK_VS                          0x10
+
 #define CBIT_INT                              0x8505
 #define MASK_I_AF_LOCK                        0x80
 #define MASK_I_AF_UNLOCK                      0x40
@@ -360,6 +363,7 @@
 #define MASK_M_TMDS_CHG                       0x01
 
 #define PACKET_INTM                           0x8514
+#define M_PK_VS                               0x10
 
 #define CBIT_INTM                             0x8515
 #define MASK_M_AF_LOCK                        0x80
@@ -696,6 +700,8 @@
 #define MASK_NCO_F0_MOD_42MHZ                 0x00
 #define MASK_NCO_F0_MOD_27MHZ                 0x01
 
+#define TYP_VS_SET                            0x8701
+
 #define PK_INT_MODE                           0x8709
 #define MASK_ISRC2_INT_MODE                   0x80
 #define MASK_ISRC_INT_MODE                    0x40
@@ -723,6 +729,7 @@
 
 #define ERR_PK_LIMIT                          0x870D
 #define NO_PKT_LIMIT2                         0x870E
+#define VS_IEEE_SEL                           0x870F
 #define PK_AVI_0HEAD                          0x8710
 #define PK_AVI_1HEAD                          0x8711
 #define PK_AVI_2HEAD                          0x8712
@@ -743,6 +750,9 @@
 #define PK_AVI_14BYTE                         0x8721
 #define PK_AVI_15BYTE                         0x8722
 #define PK_AVI_16BYTE                         0x8723
+#define PK_VS_0HEAD                           0x8770
+
+#define VS_BUFFER_SIZE                        31
 
 #define BKSV                                  0x8800
 
