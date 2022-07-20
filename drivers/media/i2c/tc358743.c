@@ -847,6 +847,8 @@ static inline void enable_stream(struct v4l2_subdev *sd, bool enable)
 
 	v4l2_info(sd, "%s: %sable\n",	__func__, enable ? "en" : "dis");
 
+    i2c_wr8(sd, PACKET_INTM, 0xff);
+
 	if (enable) {
 		/* It is critical for CSI receiver to see lane transition
 		 * LP11->HS. Set to non-continuous mode to enable clock lane
@@ -866,6 +868,9 @@ static inline void enable_stream(struct v4l2_subdev *sd, bool enable)
 	i2c_wr16_and_or(sd, CONFCTL, ~(MASK_VBUFEN | MASK_ABUFEN),
 			enable ? (MASK_VBUFEN | MASK_ABUFEN) :0x0);
 	mutex_unlock(&state->confctl_mutex);
+    if (enable)
+            i2c_wr8(sd, PACKET_INTM, ~M_PK_VS);
+
 	v4l2_info(sd,"%d:%s: end\n",__LINE__,__FUNCTION__);		
 	if (enable)	{		
         tc358743_log_status(sd);		
@@ -1219,7 +1224,6 @@ static void tc358743_enable_interrupts(struct v4l2_subdev *sd, bool cable_connec
 					MASK_M_AF_UNLOCK) &0xff);
 		i2c_wr8(sd, AUDIO_INTM, ~MASK_M_BUFINIT_END);
 		i2c_wr8(sd, MISC_INTM, ~MASK_M_SYNC_CHG);
-        i2c_wr8(sd, PACKET_INTM, ~M_PK_VS);
 	} else {
 		i2c_wr8(sd, SYS_INTM, ~MASK_M_DDC &0xff);
 		i2c_wr8(sd, CLK_INTM,0xff);
