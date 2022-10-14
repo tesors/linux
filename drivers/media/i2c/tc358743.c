@@ -1171,6 +1171,7 @@ static void tc358743_format_change(struct v4l2_subdev *sd)
 		.type = V4L2_EVENT_SOURCE_CHANGE,
 		.u.src_change.changes = V4L2_EVENT_SRC_CH_RESOLUTION,
 	};
+	int valid_counter = 0;
 
 	v4l2_info(sd, "%s: Format changed\n", __func__);
 
@@ -1186,6 +1187,14 @@ static void tc358743_format_change(struct v4l2_subdev *sd)
 	} else {
 		if (!v4l2_match_dv_timings(&state->timings, &timings, 0, false))
 			enable_stream(sd, false);
+
+		while(!(tc35874_valid_dv_timings(&timings, &tc358743_timings_cap, NULL, NULL))){
+			msleep(200);
+			tc358743_get_detected_timings(sd, &timings);
+			valid_counter++;
+			if (valid_counter == 5)
+				break;
+		}
 
         /* automaticly set timing rather than set by userspace */
         if (tc358743_s_dv_timings(sd, &timings) == 0) {
